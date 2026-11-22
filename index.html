@@ -104,6 +104,11 @@
   .ci { border-radius: 6px; background: var(--line); color: var(--ink); object-fit: contain; }
   .av.lg, .ci.lg { width: 56px; height: 56px; font-size: 1.1rem; margin: 0; }
   .who { display: inline-flex; align-items: center; }
+  /* Avatar beside each player's name dropdown */
+  .who-pick { display: flex; align-items: center; gap: 0.4rem; }
+  .who-pick select { flex: 1; min-width: 0; }
+  .who-pick .av { width: 36px; height: 36px; margin: 0; font-size: 0.8rem; }
+  .av.empty { background: transparent; border: 2px dashed var(--line); }
 
   /* Character picker */
   .charbtn {
@@ -722,6 +727,15 @@ function fillWho(row, value = row.querySelector(".p-who").value) {
     roster().map(n => `<option value="${esc(n)}"${taken.has(n) ? " disabled" : ""}>${esc(n)}</option>`).join("") +
     `<option value="${NEW_GUEST}">+ New guest...</option>`;
   row.querySelector(".p-who").value = value || "";
+  showRowAvatar(row);
+}
+// The avatar beside the dropdown: the picked player's picture, the typed guest's
+// initials, a grey CPU badge, or an empty dashed circle.
+function showRowAvatar(row) {
+  const name = row.querySelector(".p-cpu").checked ? null : nameOf(row);
+  row.querySelector(".p-av").innerHTML = row.querySelector(".p-cpu").checked
+    ? `<span class="av" style="background:#888">CPU</span>`
+    : name ? avatar(name) : `<span class="av empty"></span>`;
 }
 function refreshWho() { document.querySelectorAll("#playerRows .player").forEach(r => fillWho(r)); }
 
@@ -731,7 +745,7 @@ function playerRow() {
   div.className = "player";
   div.innerHTML = `
     <span class="num"></span>
-    <div class="name"><label>Name</label><select class="p-who"></select>
+    <div class="name"><label>Name</label><div class="who-pick"><span class="p-av"></span><select class="p-who"></select></div>
       <input class="p-name hidden" maxlength="30" placeholder="Guest name" style="margin-top:0.3rem">
       <div class="cpu"><input type="checkbox" class="p-cpu"><label>CPU</label></div></div>
     <div class="char"><label>Character</label><button type="button" class="charbtn p-char"></button></div>
@@ -755,6 +769,7 @@ function playerRow() {
     if (guest) div.querySelector(".p-name").focus();
     refreshWho();
   });
+  div.querySelector(".p-name").addEventListener("input", () => showRowAvatar(div));
   fillWho(div);
   div.querySelector(".p-cpu + label").addEventListener("click", () => cpu.click());
   div.querySelector(".icon-btn").addEventListener("click", () => {
