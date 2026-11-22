@@ -109,6 +109,19 @@
   .who-pick select { flex: 1; min-width: 0; }
   .who-pick .av { width: 36px; height: 36px; margin: 0; font-size: 0.8rem; }
   .av.empty { background: transparent; border: 2px dashed var(--line); }
+  /* Party Animal subtitle: most milk parties thrown */
+  .who.titled { flex-wrap: wrap; }
+  .title-tag { display: block; flex-basis: 100%; padding-left: calc(28px + 0.4rem); font-size: 0.7rem; font-weight: bold;
+    letter-spacing: 0.04em; text-transform: uppercase; color: var(--gold); line-height: 1.1; }
+  /* Milk party counter, only on the MILK PARTY!!! board */
+  #playerRows:not(.milk) .milk-col { display: none; }
+  .milk-col { grid-column: 2 / -1; display: flex; align-items: center; gap: 0.6rem; }
+  .milk-col label { margin: 0; }
+  .stepper { display: inline-flex; align-items: center; border: 2px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .stepper button { width: 2.6rem; height: 2.4rem; border: none; background: var(--bg); color: var(--ink); font-size: 1.3rem; cursor: pointer; }
+  .stepper .p-milk { min-width: 2.2rem; text-align: center; font-weight: bold; font-variant-numeric: tabular-nums; }
+  .milk-tag { font-size: 0.75rem; font-weight: bold; color: var(--gold); }
+  @media (max-width: 640px) { .milk-col { grid-column: 1 / -1; } }
 
   /* Character picker */
   .charbtn {
@@ -276,7 +289,7 @@
     <h2>Characters</h2>
     <div class="table-wrap"><table id="charTable"></table></div>
     <p class="note">Human players only. Characters need 3 picks to be ranked.
-    <b>Milk parties</b> counts every time a character was at a MILK PARTY!!! game, CPUs included.</p>
+    <b>Milk parties</b> counts the milk parties thrown while playing that character, CPUs included.</p>
   </section>
 
   <!-- BOARDS -->
@@ -464,6 +477,15 @@ function charIcon(name, size = "") {
   return CHAR_IMG[name] ? `<img class="ci ${size}" src="${CHAR_IMG[name]}" alt="">` : `<span class="ci ${size}">${esc(initials(name))}</span>`;
 }
 const who = name => `<span class="who">${avatar(name)}<b>${esc(name)}</b></span>`;
+// Party Animal: whoever has thrown the most milk parties (ties share it).
+let PARTY_ANIMALS = new Set();
+function setPartyAnimals() {
+  const top = Math.max(0, ...data.players.map(p => p.milk_parties || 0));
+  PARTY_ANIMALS = new Set(top > 0 ? data.players.filter(p => p.milk_parties === top).map(p => p.player_key) : []);
+}
+const whoTitled = name => PARTY_ANIMALS.has(keyOf(name))
+  ? `<span class="who titled">${avatar(name)}<b>${esc(name)}</b><span class="title-tag">Party Animal</span></span>`
+  : who(name);
 const charWho = name => `<span class="who">${charIcon(name)}${esc(name)}</span>`;
 
 function showCached() {
@@ -501,11 +523,13 @@ function renderAll() {
   // Older offline caches may lack the newer keys.
   for (const k of ["partners", "profiles", "charList"]) data[k] = data[k] || [];
   setLookups();
+  setPartyAnimals();
   data.players.sort((a, b) => byRank(a, b, "rank") || b.games - a.games);
   data.history.sort((a, b) => b.played_on.localeCompare(a.played_on) || b.created_at.localeCompare(a.created_at));
   $("nameList").innerHTML = roster().map(n => `<option value="${esc(n)}">`).join("");
   const boardSel = $("gBoard"), keepBoard = boardSel.value;
   fillSelect(boardSel, [...data.boards].sort((a, b) => a.sort_order - b.sort_order || a.board.localeCompare(b.board)).map(b => b.board), keepBoard);
+  applyBoard();
   refreshCharButtons();
   refreshWho();
   renderPlayers();
@@ -533,12 +557,12 @@ function renderPlayers() {
   if (!list.length) return emptyRow("playersTable", canEdit ? "No games yet. Add one on the Add game tab." : "No games logged yet.");
   $("playersTable").innerHTML =
     `<thead><tr><th>#</th><th>Player</th><th class="n">Games</th><th class="n">Wins</th><th class="n">Win %</th><th class="n">vs. luck</th>
-     <th class="n">Stars</th><th class="n">Stars/game</th><th class="n">Avg place</th><th>Main</th><th>Best board</th></tr></thead><tbody>` +
+     <th class="n">Stars</th><th class="n">Stars/game</th><th class="n">Avg place</th><th class="n">Milk parties</th><th>Main</th><th>Best board</th></tr></thead><tbody>` +
     list.map(p => `<tr class="${p.rank ? "" : "unranked"}">
-      <td>${p.rank ?? "-"}</td><td>${who(p.player)}</td>
+      <td>${p.rank ?? "-"}</td><td>${whoTitled(p.player)}</td>
       <td class="n">${p.games}</td><td class="n">${p.wins}</td><td class="n">${pctCell(p.win_pct)}</td>
       <td class="n">${p.vs_luck === null ? "-" : Number(p.vs_luck).toFixed(2) + "x"}</td>
-      <td class="n">${p.stars}</td><td class="n">${num(p.stars_per_game)}</td><td class="n">${num(p.avg_place)}</td>
+      <td class="n">${p.stars}</td><td class="n">${num(p.stars_per_game)}</td><td class="n">${num(p.avg_place)}</td><td class="n">${p.milk_parties ?? 0}</td>
       <td>${p.main_character ? charWho(p.main_character) : "-"}</td><td>${p.best_board ? esc(p.best_board) + " (" + p.best_board_wins + ")" : "-"}</td></tr>`).join("") +
     "</tbody>";
 }
@@ -570,7 +594,7 @@ function renderRankings() {
   if (mode === "overall") {
     rows = [...rows].sort((a, b) => byRank(a, b, "rank_overall") || b.win_pct - a.win_pct || b.games - a.games);
     $("rankTable").innerHTML = `<thead><tr><th>#</th><th>Player</th><th>Character</th>${statHead}</tr></thead><tbody>` +
-      rows.map(r => `<tr class="${r.rank_overall ? "" : "unranked"}"><td>${r.rank_overall ?? "-"}</td><td>${who(r.player)}</td><td>${charWho(r.character)}</td>${stats(r)}</tr>`).join("") + "</tbody>";
+      rows.map(r => `<tr class="${r.rank_overall ? "" : "unranked"}"><td>${r.rank_overall ?? "-"}</td><td>${whoTitled(r.player)}</td><td>${charWho(r.character)}</td>${stats(r)}</tr>`).join("") + "</tbody>";
     $("rankNote").textContent = "Every player and character pair ranked against each other by win ratio. Pairs need 2 games to be ranked.";
     return;
   }
@@ -585,7 +609,7 @@ function renderRankings() {
     `<thead><tr><th>${mode === "player" ? "Player" : "Character"}</th><th>#</th><th>${mode === "player" ? "Character" : "Player"}</th>${statHead}</tr></thead><tbody>` +
     rows.map(r => {
       const first = r[group] !== last; last = r[group];
-      return `<tr class="${first ? "group-start" : ""}"><td>${first ? (group === "player" ? who(r.player) : charWho(r.character)) : ""}</td><td>${r[rankField]}</td><td>${other === "player" ? who(r.player) : charWho(r.character)}</td>${stats(r)}</tr>`;
+      return `<tr class="${first ? "group-start" : ""}"><td>${first ? (group === "player" ? whoTitled(r.player) : charWho(r.character)) : ""}</td><td>${r[rankField]}</td><td>${other === "player" ? whoTitled(r.player) : charWho(r.character)}</td>${stats(r)}</tr>`;
     }).join("") + "</tbody>";
   $("rankNote").textContent = mode === "player"
     ? "Within each player, characters ranked by win ratio, then wins. #1 is that player's best pick."
@@ -652,7 +676,7 @@ function renderHistory() {
 
 function seatHTML(p) {
   return `<span class="who">${p.cpu ? `<span class="av" style="background:#888">CPU</span>` : avatar(p.name)}${esc(p.cpu ? "CPU" : p.name)}</span>
-    <span class="muted">${charIcon(p.character)}</span>&#9733;${esc(p.stars)}`;
+    <span class="muted">${charIcon(p.character)}</span>&#9733;${esc(p.stars)}${p.milk_parties ? ` <span class="milk-tag">Milk x${esc(p.milk_parties)}</span>` : ""}`;
 }
 // Free-for-all: one pill per seat. Partner Party: one pill per team, teammates together.
 function historyPills(g) {
@@ -755,8 +779,16 @@ function playerRow() {
     <div><label>Place</label><select class="p-place"></select></div>
     <div><label>Stars</label><input class="p-stars" type="number" inputmode="numeric" min="0" max="99" value="0"></div>
     <div><label>Coins</label><input class="p-coins" type="number" inputmode="numeric" min="0" max="999" value="0"></div>
-    <button type="button" class="icon-btn" title="Remove player" aria-label="Remove player">&times;</button>`;
+    <button type="button" class="icon-btn" title="Remove player" aria-label="Remove player">&times;</button>
+    <div class="milk-col"><label>Milk parties</label>
+      <div class="stepper"><button type="button" data-step="-1" aria-label="One less milk party">&minus;</button><span class="p-milk">0</span><button type="button" data-step="1" aria-label="One more milk party">+</button></div></div>`;
   setChar(div, CHARACTERS[0]);
+  div.querySelector(".stepper").addEventListener("click", e => {
+    const step = Number(e.target.dataset.step || 0);
+    if (!step) return;
+    const el = div.querySelector(".p-milk");
+    el.textContent = Math.max(0, Math.min(99, Number(el.textContent) + step));
+  });
   div.querySelector(".p-char").addEventListener("click", () => openCharPicker(div));
   const cpu = div.querySelector(".p-cpu");
   cpu.addEventListener("change", () => {
@@ -822,11 +854,15 @@ function applyMode() {
   renumber();
 }
 $("gMode").addEventListener("change", applyMode);
+const MILK_BOARD = "MILK PARTY!!!";
+function applyBoard() { $("playerRows").classList.toggle("milk", $("gBoard").value === MILK_BOARD); }
+$("gBoard").addEventListener("change", applyBoard);
 
 function resetForm() {
   $("playerRows").innerHTML = "";
   for (let i = 0; i < 4; i++) $("playerRows").appendChild(playerRow());
   applyMode();
+  applyBoard();
   $("photoInput").value = "";
   $("photoPreview").classList.add("hidden");
   photoData = null;
@@ -875,6 +911,7 @@ function readForm() {
     cpu: r.querySelector(".p-cpu").checked,
     character: charOf(r),
     team: isPartner() ? Number(r.querySelector(".p-team").value) : null,
+    milk_parties: $("gBoard").value === MILK_BOARD ? Number(r.querySelector(".p-milk").textContent) : 0,
     place: r.querySelector(".p-place").selectedIndex + 1,
     stars: Math.max(0, Math.min(99, parseInt(r.querySelector(".p-stars").value, 10) || 0)),
     coins: Math.max(0, Math.min(999, parseInt(r.querySelector(".p-coins").value, 10) || 0))

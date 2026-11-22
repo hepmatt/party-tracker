@@ -115,6 +115,11 @@ create table if not exists public.game_players (
 -- Partner Party team (1-4). NULL in every other mode.
 alter table public.game_players add column if not exists team smallint check (team between 1 and 4);
 
+-- Times this seat landed on Wiggler's Milk Saloon and paid for a milk party.
+-- Only logged on the MILK PARTY!!! board; 0 everywhere else.
+alter table public.game_players add column if not exists milk_parties smallint not null default 0
+  check (milk_parties between 0 and 99);
+
 -- The same person cannot sit in one game twice.
 create unique index if not exists game_players_one_seat_per_person
   on public.game_players (game_id, player_key) where not is_cpu;
@@ -237,7 +242,7 @@ begin
           (p_game ->> 'turns')::smallint)
   returning id into v_id;
 
-  insert into game_players (game_id, seat, player_name, is_cpu, character, place, stars, coins, team)
+  insert into game_players (game_id, seat, player_name, is_cpu, character, place, stars, coins, team, milk_parties)
   select v_id,
          t.ord,
          case when coalesce((t.p ->> 'cpu')::boolean, false) then null
@@ -247,7 +252,9 @@ begin
          (t.p ->> 'place')::smallint,
          coalesce((t.p ->> 'stars')::smallint, 0),
          coalesce((t.p ->> 'coins')::smallint, 0),
-         case when v_partner then (t.p ->> 'team')::smallint end
+         case when v_partner then (t.p ->> 'team')::smallint end,
+         case when p_game ->> 'board' = 'MILK PARTY!!!'
+              then coalesce((t.p ->> 'milk_parties')::smallint, 0) else 0 end
   from jsonb_array_elements(p_game -> 'players') with ordinality as t (p, ord);
 
   -- Partner Party: everyone on a team of exactly 2, teammates share a place.
@@ -331,7 +338,8 @@ agg as (
          sum(1.0 / n_sides)                         as expected_wins,
          sum(stars)::int                            as stars,
          avg(stars)                                 as avg_stars,
-         avg(place)                                 as avg_place
+         avg(place)                                 as avg_place,
+         sum(milk_parties)::int                     as milk_parties
   from humans
   group by player_key
 ),
@@ -363,7 +371,8 @@ select case when a.games >= 3 then
        round(a.avg_place, 2)                      as avg_place,
        m.main_character,
        b.best_board,
-       b.best_board_wins
+       b.best_board_wins,
+       a.milk_parties
 from agg a
 join public.player_names n using (player_key)
 left join mains m using (player_key)
@@ -391,13 +400,11 @@ fans as (
   group by h.character, n.player
   order by h.character, count(*) desc, n.player
 ),
--- MILK PARTY!!! attendance: every seat on that board, CPUs included.
+-- Milk parties thrown while playing each character (logged per seat, CPUs included).
 milk as (
-  select gp.character, count(*)::int as milk_parties
-  from public.game_players gp
-  join public.games g on g.id = gp.game_id
-  where g.board = 'MILK PARTY!!!'
-  group by gp.character
+  select character, sum(milk_parties)::int as milk_parties
+  from public.game_players
+  group by character
 )
 select case when coalesce(a.picks, 0) >= 3 then
          rank() over (partition by coalesce(a.picks, 0) >= 3
@@ -545,7 +552,8 @@ select g.id,
        exists (select 1 from public.game_photos ph where ph.game_id = g.id) as has_photo,
        (select json_agg(json_build_object(
                   'name', gp.player_name, 'cpu', gp.is_cpu, 'character', gp.character,
-                  'place', gp.place, 'stars', gp.stars, 'coins', gp.coins, 'team', gp.team)
+                  'place', gp.place, 'stars', gp.stars, 'coins', gp.coins, 'team', gp.team,
+                  'milk_parties', gp.milk_parties)
                 order by gp.place, gp.team, gp.seat)
         from public.game_players gp
         where gp.game_id = g.id)                                         as players
