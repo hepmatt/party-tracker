@@ -497,11 +497,11 @@ function renderAll() {
   setLookups();
   data.players.sort((a, b) => byRank(a, b, "rank") || b.games - a.games);
   data.history.sort((a, b) => b.played_on.localeCompare(a.played_on) || b.created_at.localeCompare(a.created_at));
-  const names = [...new Set([...data.players.map(p => p.player), ...data.profiles.map(p => p.display_name)])];
-  $("nameList").innerHTML = names.map(n => `<option value="${esc(n)}">`).join("");
+  $("nameList").innerHTML = roster().map(n => `<option value="${esc(n)}">`).join("");
   const boardSel = $("gBoard"), keepBoard = boardSel.value;
   fillSelect(boardSel, [...data.boards].sort((a, b) => a.sort_order - b.sort_order || a.board.localeCompare(b.board)).map(b => b.board), keepBoard);
   refreshCharButtons();
+  refreshWho();
   renderPlayers();
   renderRankFilter();
   renderRankings();
@@ -692,13 +692,47 @@ $("charGrid").addEventListener("click", e => {
 });
 $("charCancel").addEventListener("click", () => $("charDialog").close());
 
+/* ----- Player dropdown: everyone on the roster, plus "+ New guest" ----- */
+const NEW_GUEST = "__new__";
+function roster() {
+  const m = new Map();
+  data.profiles.forEach(p => m.set(p.player_key, p.display_name));
+  data.players.forEach(p => { if (!m.has(p.player_key)) m.set(p.player_key, p.player); });
+  return [...m.values()].sort((a, b) => a.localeCompare(b));
+}
+// Typed guest names that match someone on the roster use the roster spelling.
+function nameOf(row) {
+  const v = row.querySelector(".p-who").value;
+  if (v !== NEW_GUEST) return v;
+  const typed = row.querySelector(".p-name").value.trim().replace(/\s+/g, " ");
+  return roster().find(n => keyOf(n) === keyOf(typed)) || typed;
+}
+function setName(row, name) {
+  const sel = row.querySelector(".p-who"), inp = row.querySelector(".p-name");
+  const known = name && roster().find(n => keyOf(n) === keyOf(name));
+  fillWho(row, known || (name ? NEW_GUEST : ""));
+  inp.value = known ? "" : (name || "");
+  inp.classList.toggle("hidden", sel.value !== NEW_GUEST);
+}
+// Build one row's options; people already picked in another row are greyed out.
+function fillWho(row, value = row.querySelector(".p-who").value) {
+  const taken = new Set([...$("playerRows").children].filter(r => r !== row)
+    .map(r => r.querySelector(".p-who").value).filter(v => v && v !== NEW_GUEST));
+  row.querySelector(".p-who").innerHTML = `<option value="">Choose player...</option>` +
+    roster().map(n => `<option value="${esc(n)}"${taken.has(n) ? " disabled" : ""}>${esc(n)}</option>`).join("") +
+    `<option value="${NEW_GUEST}">+ New guest...</option>`;
+  row.querySelector(".p-who").value = value || "";
+}
+function refreshWho() { document.querySelectorAll("#playerRows .player").forEach(r => fillWho(r)); }
+
 /* ----- Player rows ----- */
 function playerRow() {
   const div = document.createElement("div");
   div.className = "player";
   div.innerHTML = `
     <span class="num"></span>
-    <div class="name"><label>Name</label><input class="p-name" list="nameList" maxlength="30" placeholder="Name">
+    <div class="name"><label>Name</label><select class="p-who"></select>
+      <input class="p-name hidden" maxlength="30" placeholder="Guest name" style="margin-top:0.3rem">
       <div class="cpu"><input type="checkbox" class="p-cpu"><label>CPU</label></div></div>
     <div class="char"><label>Character</label><button type="button" class="charbtn p-char"></button></div>
     <div class="team-col"><label>Team</label><select class="p-team">
@@ -711,10 +745,17 @@ function playerRow() {
   div.querySelector(".p-char").addEventListener("click", () => openCharPicker(div));
   const cpu = div.querySelector(".p-cpu");
   cpu.addEventListener("change", () => {
-    const name = div.querySelector(".p-name");
-    name.disabled = cpu.checked;
-    if (cpu.checked) name.value = "";
+    div.querySelector(".p-who").disabled = cpu.checked;
+    if (cpu.checked) setName(div, "");
+    refreshWho();
   });
+  div.querySelector(".p-who").addEventListener("change", e => {
+    const guest = e.target.value === NEW_GUEST;
+    div.querySelector(".p-name").classList.toggle("hidden", !guest);
+    if (guest) div.querySelector(".p-name").focus();
+    refreshWho();
+  });
+  fillWho(div);
   div.querySelector(".p-cpu + label").addEventListener("click", () => cpu.click());
   div.querySelector(".icon-btn").addEventListener("click", () => {
     if ($("playerRows").children.length > 2) { div.remove(); renumber(); }
@@ -746,6 +787,7 @@ function renumber() {
     r.dataset.team = r.querySelector(".p-team").value;
   });
   $("addRowBtn").disabled = rows.length >= MAX_PLAYERS || isPartner();
+  refreshWho();
 }
 
 // Partner Party in Jamboree is 2 vs 2: four rows, Team A on top, Team B below.
@@ -813,7 +855,7 @@ function readForm() {
   const played_on = $("gDate").value;
   if (!played_on) throw new Error("Pick a date.");
   const players = [...$("playerRows").children].map(r => ({
-    name: r.querySelector(".p-cpu").checked ? null : r.querySelector(".p-name").value.trim().replace(/\s+/g, " "),
+    name: r.querySelector(".p-cpu").checked ? null : nameOf(r),
     cpu: r.querySelector(".p-cpu").checked,
     character: charOf(r),
     team: isPartner() ? Number(r.querySelector(".p-team").value) : null,
@@ -821,7 +863,7 @@ function readForm() {
     stars: Math.max(0, Math.min(99, parseInt(r.querySelector(".p-stars").value, 10) || 0)),
     coins: Math.max(0, Math.min(999, parseInt(r.querySelector(".p-coins").value, 10) || 0))
   }));
-  if (players.some(p => !p.cpu && !p.name)) throw new Error("Every non-CPU player needs a name.");
+  if (players.some(p => !p.cpu && !p.name)) throw new Error("Choose a player, or type a guest name, for every row.");
   if (!players.some(p => !p.cpu)) throw new Error("At least one player must be a person.");
   const keys = players.filter(p => !p.cpu).map(p => keyOf(p.name));
   if (new Set(keys).size !== keys.length) throw new Error("The same name is in the game twice.");
@@ -844,20 +886,22 @@ $("saveBtn").addEventListener("click", async () => {
   try {
     must(await sb.rpc("add_game", { p_game: game, p_photo: photoData }));
     // Keep names and characters for the next game of the night, reset the rest.
-    const keep = [...$("playerRows").children].map(r => ({ name: r.querySelector(".p-name").value, cpu: r.querySelector(".p-cpu").checked, char: charOf(r), team: r.querySelector(".p-team").value }));
+    const keep = [...$("playerRows").children].map(r => ({ name: nameOf(r), cpu: r.querySelector(".p-cpu").checked, char: charOf(r), team: r.querySelector(".p-team").value }));
+    // New guests are now on the roster, so reload it before refilling the rows.
+    await refresh();
     resetForm();
     while ($("playerRows").children.length < keep.length) $("playerRows").appendChild(playerRow());
     [...$("playerRows").children].forEach((r, i) => {
-      r.querySelector(".p-name").value = keep[i].name;
       r.querySelector(".p-cpu").checked = keep[i].cpu;
-      r.querySelector(".p-name").disabled = keep[i].cpu;
+      r.querySelector(".p-who").disabled = keep[i].cpu;
+      setName(r, keep[i].name);
       setChar(r, keep[i].char);
       r.querySelector(".p-team").value = keep[i].team;
       r.dataset.team = keep[i].team;
     });
     renumber();
+    refreshWho();
     setMsg("Saved. Names and characters are kept for the next game.");
-    await refresh();
   } catch (e) {
     setMsg("Save failed: " + e.message, true);
   } finally {
@@ -936,12 +980,10 @@ function pickFile() {
 }
 function flash(id, text, isErr) { $(id).className = "msg " + (isErr ? "err" : "ok"); $(id).textContent = text; }
 
-const extraNames = new Set();   // players added on this tab who have not played yet
 function renderProfiles() {
   const names = new Map();
   data.players.forEach(p => names.set(p.player_key, p.player));
   data.profiles.forEach(p => names.set(p.player_key, p.display_name));
-  extraNames.forEach(n => { if (!names.has(keyOf(n))) names.set(keyOf(n), n); });
   const list = [...names.entries()].sort((a, b) => a[1].localeCompare(b[1]));
   $("profileList").innerHTML = !list.length ? `<p class="muted">No players yet. Add one below.</p>` :
     list.map(([k, n]) => {
@@ -951,7 +993,7 @@ function renderProfiles() {
         <button type="button" class="small-btn" data-act="upload">Upload photo</button>
         <select data-act="char"><option value="">Use a character...</option>${CHARACTERS.map(c =>
           `<option value="${esc(c)}"${c === borrowed ? " selected" : ""}>${esc(c)}</option>`).join("")}</select>
-        ${p ? `<button type="button" class="small-btn danger" data-act="clear">Remove</button>` : ""}</div>`;
+        ${p && (p.avatar || p.avatar_character) ? `<button type="button" class="small-btn danger" data-act="clear">Remove picture</button>` : ""}</div>`;
     }).join("");
   $("charTiles").innerHTML = CHARACTERS.map(c => `<div class="char-tile" data-char="${esc(c)}">${charIcon(c, "lg")}<div>${esc(c)}</div>
       <button type="button" class="small-btn" data-act="upload">Upload</button>${CHAR_IMG[c] ? ` <button type="button" class="small-btn danger" data-act="clear">Remove</button>` : ""}</div>`).join("");
@@ -962,7 +1004,7 @@ async function saveAvatar(name, img, character) {
   try {
     must(await sb.rpc("set_player_avatar", { p_name: name, p_avatar: img, p_character: character }));
     await refresh();
-    flash("profileMsg", img || character ? `Avatar saved for ${name}.` : `Avatar removed for ${name}.`);
+    flash("profileMsg", img || character ? `Avatar saved for ${name}.` : `Picture removed for ${name}.`);
   } catch (e) { flash("profileMsg", "Could not save: " + e.message, true); }
 }
 $("profileList").addEventListener("click", async e => {
@@ -979,13 +1021,15 @@ $("profileList").addEventListener("change", e => {
   if (e.target.dataset.act !== "char" || !e.target.value) return;
   saveAvatar(e.target.closest(".prof-row").dataset.name, null, e.target.value);
 });
-$("addProfileBtn").addEventListener("click", () => {
+$("addProfileBtn").addEventListener("click", async () => {
   const n = $("newProfileName").value.trim().replace(/\s+/g, " ");
   if (!n) return flash("profileMsg", "Type a name first.", true);
-  extraNames.add(n);
-  $("newProfileName").value = "";
-  renderProfiles();
-  flash("profileMsg", `${n} added. Now upload a photo or pick a character for them.`);
+  try {
+    must(await sb.rpc("add_player", { p_name: n }));
+    $("newProfileName").value = "";
+    await refresh();
+    flash("profileMsg", `${n} added. Upload a photo or pick a character for them.`);
+  } catch (e) { flash("profileMsg", "Could not add: " + e.message, true); }
 });
 
 $("charTiles").addEventListener("click", async e => {

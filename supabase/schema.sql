@@ -155,7 +155,27 @@ begin
 end;
 $$;
 
--- Pass NULL for both p_avatar and p_character to clear a profile.
+-- Add a person to the roster with no picture yet. Safe to call twice.
+create or replace function public.add_player(p_name text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_name text := regexp_replace(btrim(coalesce(p_name, '')), '\s+', ' ', 'g');
+begin
+  if not public.is_editor() then
+    raise exception 'Only approved editors can add players.' using errcode = '42501';
+  end if;
+  if v_name = '' then raise exception 'A player name is required.'; end if;
+  insert into player_profiles (player_key, display_name)
+  values (lower(v_name), v_name)
+  on conflict (player_key) do nothing;
+end;
+$$;
+
+-- Pass NULL for both p_avatar and p_character to clear the picture (the player stays).
 create or replace function public.set_player_avatar(p_name text, p_avatar text, p_character text default null)
 returns void
 language plpgsql
@@ -170,10 +190,6 @@ begin
     raise exception 'Only approved editors can change avatars.' using errcode = '42501';
   end if;
   if v_name = '' then raise exception 'A player name is required.'; end if;
-  if p_avatar is null and p_character is null then
-    delete from player_profiles where player_key = v_key;
-    return;
-  end if;
   insert into player_profiles (player_key, display_name, avatar, avatar_character, updated_at)
   values (v_key, v_name, p_avatar, p_character, now())
   on conflict (player_key) do update
@@ -254,6 +270,13 @@ begin
   if p_photo is not null then
     insert into game_photos (game_id, data) values (v_id, p_photo);
   end if;
+
+  -- Guests typed in on the spot join the roster for next time.
+  insert into player_profiles (player_key, display_name)
+  select distinct on (player_key) player_key, player_name
+  from game_players
+  where game_id = v_id and not is_cpu
+  on conflict (player_key) do nothing;
 
   return v_id;
 end;
@@ -513,6 +536,12 @@ select g.id,
 from public.games g;
 
 
+-- Everyone who has already played is on the roster too.
+insert into public.player_profiles (player_key, display_name)
+select player_key, player from public.player_names
+on conflict (player_key) do nothing;
+
+
 -- ---------------------------------------------------------------------
 -- 5. Permissions and row level security
 -- ---------------------------------------------------------------------
@@ -563,6 +592,8 @@ grant  execute on function public.add_game(jsonb, text) to authenticated;
 
 revoke execute on function public.set_character_image(text, text) from public, anon;
 grant  execute on function public.set_character_image(text, text) to authenticated;
+revoke execute on function public.add_player(text) from public, anon;
+grant  execute on function public.add_player(text) to authenticated;
 revoke execute on function public.set_player_avatar(text, text, text) from public, anon;
 grant  execute on function public.set_player_avatar(text, text, text) to authenticated;
 

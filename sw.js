@@ -1,6 +1,6 @@
 /* Service worker: makes the tracker installable and lets it open offline.
    Bump VERSION whenever you change a file below so phones pick up the update. */
-const VERSION = "v2";
+const VERSION = "v3";
 const CACHE = "party-tracker-" + VERSION;
 const SHELL = [
   "./", "index.html", "config.js", "manifest.webmanifest", "vendor/supabase.js",
