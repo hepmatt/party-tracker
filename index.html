@@ -275,7 +275,8 @@
   <section id="tab-characters" class="card hidden">
     <h2>Characters</h2>
     <div class="table-wrap"><table id="charTable"></table></div>
-    <p class="note">Human players only. Characters need 3 picks to be ranked.</p>
+    <p class="note">Human players only. Characters need 3 picks to be ranked.
+    <b>Milk parties</b> counts every time a character was at a MILK PARTY!!! game, CPUs included.</p>
   </section>
 
   <!-- BOARDS -->
@@ -622,9 +623,9 @@ function renderChars() {
   const list = [...data.chars].sort((a, b) => byRank(a, b, "rank") || b.picks - a.picks || a.character.localeCompare(b.character));
   if (!list.length) return emptyRow("charTable", "No characters loaded.");
   $("charTable").innerHTML =
-    `<thead><tr><th>#</th><th>Character</th><th class="n">Picks</th><th class="n">Wins</th><th class="n">Win %</th><th class="n">Stars/game</th><th>Played most by</th></tr></thead><tbody>` +
+    `<thead><tr><th>#</th><th>Character</th><th class="n">Picks</th><th class="n">Wins</th><th class="n">Win %</th><th class="n">Stars/game</th><th class="n">Milk parties</th><th>Played most by</th></tr></thead><tbody>` +
     list.map(c => `<tr class="${c.rank ? "" : "unranked"}"><td>${c.rank ?? "-"}</td><td>${charWho(c.character)}</td><td class="n">${c.picks}</td><td class="n">${c.wins}</td>
-      <td class="n">${pctCell(c.win_pct)}</td><td class="n">${num(c.stars_per_game)}</td><td>${c.top_player ? who(c.top_player) + " (" + c.top_player_picks + ")" : "-"}</td></tr>`).join("") +
+      <td class="n">${pctCell(c.win_pct)}</td><td class="n">${num(c.stars_per_game)}</td><td class="n">${c.milk_parties ?? 0}</td><td>${c.top_player ? who(c.top_player) + " (" + c.top_player_picks + ")" : "-"}</td></tr>`).join("") +
     "</tbody>";
 }
 

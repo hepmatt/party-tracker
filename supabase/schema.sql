@@ -69,10 +69,16 @@ insert into public.characters (name) values
   ('Monty Mole'), ('Pauline'), ('Ninji'), ('Spike')
 on conflict do nothing;
 
+-- Western Land (the train board, home of Wiggler's Milk Saloon) goes by
+-- MILK PARTY!!! here. Renaming the key cascades to every logged game.
+update public.boards set name = 'MILK PARTY!!!'
+where name = 'Western Land'
+  and not exists (select 1 from public.boards where name = 'MILK PARTY!!!');
+
 insert into public.boards (name, sort_order) values
   ('Mega Wiggler''s Tree Party', 1), ('Rainbow Galleria', 2), ('Goomba Lagoon', 3),
   ('Roll ''em Raceway', 4), ('King Bowser''s Keep', 5),
-  ('Mario''s Rainbow Castle', 6), ('Western Land', 7)
+  ('Mario''s Rainbow Castle', 6), ('MILK PARTY!!!', 7)
 on conflict do nothing;
 
 
@@ -384,6 +390,14 @@ fans as (
   join public.player_names n using (player_key)
   group by h.character, n.player
   order by h.character, count(*) desc, n.player
+),
+-- MILK PARTY!!! attendance: every seat on that board, CPUs included.
+milk as (
+  select gp.character, count(*)::int as milk_parties
+  from public.game_players gp
+  join public.games g on g.id = gp.game_id
+  where g.board = 'MILK PARTY!!!'
+  group by gp.character
 )
 select case when coalesce(a.picks, 0) >= 3 then
          rank() over (partition by coalesce(a.picks, 0) >= 3
@@ -396,10 +410,12 @@ select case when coalesce(a.picks, 0) >= 3 then
        round(a.avg_stars, 1)                                as stars_per_game,
        round(a.avg_place, 2)                                as avg_place,
        f.top_player,
-       f.top_player_picks
+       f.top_player_picks,
+       coalesce(m.milk_parties, 0)                          as milk_parties
 from public.characters c
 left join agg  a on a.character = c.name
-left join fans f on f.character = c.name;
+left join fans f on f.character = c.name
+left join milk m on m.character = c.name;
 
 
 -- The aggregated ranking: one row per (player, character) pair, ranked
