@@ -82,9 +82,54 @@
   .photo-box { border: 2px dashed var(--line); border-radius: 10px; padding: 0.75rem; text-align: center; margin-bottom: 1rem; }
   .photo-box img { max-width: 100%; max-height: 360px; border-radius: 8px; display: block; margin: 0.6rem auto 0; }
   .player {
-    display: grid; grid-template-columns: 2rem 1.4fr 1.3fr 0.8fr 0.8fr 0.8fr 2rem;
+    display: grid; grid-template-columns: 2rem 1.4fr 1.5fr 0.8fr 0.8fr 0.8fr 2rem;
     gap: 0.4rem; align-items: end; padding: 0.6rem 0; border-bottom: 1px solid var(--line);
   }
+  /* Partner Party adds a Team column and colors each row by team. */
+  #playerRows:not(.partner) .team-col { display: none; }
+  #playerRows.partner .player { grid-template-columns: 2rem 1.3fr 1.5fr 0.9fr 0.8fr 0.7fr 0.7fr 2rem; border-left: 5px solid transparent; padding-left: 0.4rem; }
+  #playerRows.partner .player[data-team="1"] { border-left-color: var(--t1); }
+  #playerRows.partner .player[data-team="2"] { border-left-color: var(--t2); }
+  #playerRows.partner .player[data-team="3"] { border-left-color: var(--t3); }
+  #playerRows.partner .player[data-team="4"] { border-left-color: var(--t4); }
+  :root { --t1: #049cd8; --t2: #e52521; --t3: #1f8a4c; --t4: #8a4fd1; }
+
+  /* Avatars and character icons */
+  .av, .ci {
+    display: inline-flex; align-items: center; justify-content: center; vertical-align: middle;
+    width: 28px; height: 28px; margin-right: 0.4rem; flex: 0 0 auto;
+    font-size: 0.72rem; font-weight: bold; color: #fff; overflow: hidden; object-fit: cover;
+  }
+  .av { border-radius: 50%; }
+  .ci { border-radius: 6px; background: var(--line); color: var(--ink); object-fit: contain; }
+  .av.lg, .ci.lg { width: 56px; height: 56px; font-size: 1.1rem; margin: 0; }
+  .who { display: inline-flex; align-items: center; }
+
+  /* Character picker */
+  .charbtn {
+    width: 100%; display: flex; align-items: center; gap: 0.2rem; text-align: left; cursor: pointer;
+    font-size: 1rem; padding: 0.3rem 0.5rem; border: 2px solid var(--line); border-radius: 8px;
+    background: var(--bg); color: var(--ink); min-height: 2.6rem;
+  }
+  #charDialog { width: min(560px, 94vw); }
+  .char-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 0.5rem; max-height: 65vh; overflow-y: auto; }
+  .char-grid button {
+    display: flex; flex-direction: column; align-items: center; gap: 0.3rem; padding: 0.5rem 0.2rem;
+    border: 2px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--ink);
+    cursor: pointer; font-size: 0.78rem; line-height: 1.15;
+  }
+  .char-grid button.sel { border-color: var(--blue); background: rgba(4,156,216,0.12); }
+
+  /* Profiles tab */
+  .prof-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.6rem 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .prof-row .pname { font-weight: bold; flex: 1 1 120px; }
+  .prof-row select { width: auto; max-width: 170px; font-size: 0.9rem; padding: 0.35rem; }
+  .small-btn { background: transparent; color: var(--ink); border: 2px solid var(--line); padding: 0.35rem 0.7rem; border-radius: 8px; font-size: 0.85rem; cursor: pointer; }
+  .small-btn.danger { color: var(--red); }
+  .char-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 0.6rem; }
+  .char-tile { border: 1px solid var(--line); border-radius: 10px; padding: 0.5rem; text-align: center; font-size: 0.8rem; }
+  .char-tile .ci { margin: 0 auto 0.3rem; display: flex; }
+  .char-tile .small-btn { padding: 0.2rem 0.45rem; font-size: 0.75rem; margin-top: 0.3rem; }
   .player .num { font-weight: bold; color: var(--muted); padding-bottom: 0.6rem; }
   .player .cpu { display: flex; align-items: center; gap: 0.3rem; font-size: 0.8rem; color: var(--muted); margin-top: 0.25rem; }
   .player .cpu label { display: inline; margin: 0; }
@@ -119,7 +164,8 @@
   .game-head { display: flex; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap; align-items: baseline; }
   .game-head b { font-size: 1rem; }
   .places { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.4rem; }
-  .pill { border: 1px solid var(--line); border-radius: 999px; padding: 0.15rem 0.6rem; font-size: 0.85rem; }
+  .pill { border: 1px solid var(--line); border-radius: 10px; padding: 0.2rem 0.6rem; font-size: 0.85rem; display: inline-flex; align-items: center; gap: 0.3rem; flex-wrap: wrap; }
+  .pill .av, .pill .ci { width: 22px; height: 22px; margin-right: 0.2rem; font-size: 0.6rem; }
   .pill.first { border-color: var(--gold); background: rgba(251,208,0,0.18); font-weight: bold; }
   .pill.cpu { opacity: 0.65; }
   .link-btn { background: none; border: none; color: var(--blue); cursor: pointer; font-size: 0.85rem; padding: 0 0.3rem; }
@@ -149,6 +195,7 @@
     <button role="tab" data-tab="characters" aria-selected="false">Characters</button>
     <button role="tab" data-tab="boards" aria-selected="false">Boards</button>
     <button role="tab" data-tab="history" aria-selected="false">History</button>
+    <button role="tab" data-tab="profiles" aria-selected="false" class="edit-only">Profiles</button>
   </nav>
 
   <!-- ADD GAME -->
@@ -165,7 +212,7 @@
       <div><label for="gDate">Date</label><input type="date" id="gDate"></div>
       <div><label for="gBoard">Board</label><select id="gBoard"></select></div>
       <div><label for="gMode">Mode</label><select id="gMode"></select></div>
-      <div><label for="gTurns">Turns</label><select id="gTurns"><option>10</option><option selected>20</option><option>30</option></select></div>
+      <div><label for="gTurns">Turns</label><select id="gTurns"><option>5</option><option>10</option><option>15</option><option selected>20</option><option>25</option><option>30</option></select></div>
     </div>
 
     <h3>Players</h3>
@@ -177,7 +224,8 @@
       <button class="primary" id="saveBtn" type="button">Save game</button>
       <span id="saveMsg" class="msg"></span>
     </div>
-    <p class="note">Tick CPU for computer players. They take up a place but are left out of player and character stats. Tied players share a place, and a tie for 1st gives each of them a win. In Partner Party, give both winning teammates 1st.</p>
+    <p class="note">Tick CPU for computer players. They take up a place but are left out of player and character stats. Tied players share a place, and a tie for 1st gives each of them a win.
+    <b>Partner Party:</b> pick a team for each player. Teammates always share a place, so setting one sets the other.</p>
   </section>
 
   <!-- RANKINGS: reads the player_character_stats view -->
@@ -214,6 +262,8 @@
     <p class="muted">Only counts games where both people played, which is the fairest comparison when the group changes night to night. "Ahead" means finished in a better place.</p>
     <div style="max-width:260px;margin-bottom:0.75rem"><label for="h2hPlayer">Player</label><select id="h2hPlayer"></select></div>
     <div class="table-wrap"><table id="h2hTable"></table></div>
+    <h3>As teammates (Partner Party)</h3>
+    <div class="table-wrap"><table id="partnerTable"></table></div>
   </section>
 
   <!-- CHARACTERS -->
@@ -234,7 +284,34 @@
     <h2>Game history</h2>
     <div id="historyList"></div>
   </section>
+
+  <!-- PROFILES (editors) -->
+  <section id="tab-profiles" class="hidden">
+    <div class="card">
+      <h2>Player avatars</h2>
+      <p class="muted">Each family member picks a picture: upload a photo, or borrow a character's picture. It shows next to their name everywhere in the app.</p>
+      <div id="profileList"></div>
+      <div class="actions">
+        <input id="newProfileName" maxlength="30" placeholder="Player name" list="nameList" style="max-width:220px">
+        <button class="secondary" id="addProfileBtn" type="button">Add player</button>
+      </div>
+      <p id="profileMsg" class="msg"></p>
+    </div>
+    <div class="card">
+      <h2>Character pictures</h2>
+      <p class="muted">Tap Upload to add your own picture for a character. Square pictures with a plain or transparent background look best. They are shrunk to 128 px.</p>
+      <div id="charTiles" class="char-tiles"></div>
+      <p id="charMsg" class="msg"></p>
+    </div>
+  </section>
 </main>
+
+<dialog id="charDialog">
+  <h2 style="margin-bottom:0.6rem">Pick a character</h2>
+  <div id="charGrid" class="char-grid"></div>
+  <div class="actions" style="justify-content:flex-end"><button class="secondary" type="button" id="charCancel">Cancel</button></div>
+</dialog>
+<input type="file" id="hiddenFile" accept="image/*" class="hidden">
 
 <dialog id="photoDialog">
   <img id="dialogImg" alt="Results screen">
@@ -338,21 +415,50 @@ async function updateAuth(newSession) {
     : session.user.email + " (view only)";
   $("saveBtn").disabled = !canEdit;
   // If the Add tab was open and edit rights went away, fall back to Players.
-  if (!canEdit && !$("tab-add").classList.contains("hidden")) showTab("players");
+  if (!canEdit && (!$("tab-add").classList.contains("hidden") || !$("tab-profiles").classList.contains("hidden"))) showTab("players");
   if (canEdit && !openedAddOnce) { openedAddOnce = true; showTab("add"); }
   renderHistory();
 }
 let openedAddOnce = false;
 
 /* ---------- Offline: keep the last good stats on the device ---------- */
-const CACHE_KEY = "party-tracker-stats-v1";
+const CACHE_KEY = "party-tracker-stats-v2";
 function saveLocal(d) { try { localStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), d })); } catch (e) { /* storage full or blocked */ } }
 function loadLocal() { try { return JSON.parse(localStorage.getItem(CACHE_KEY)); } catch (e) { return null; } }
 
 /* =====================================================================
    3. RENDERING. The math lives in the SQL views; this just draws tables.
    ===================================================================== */
-let data = { players: [], chars: [], combos: [], h2h: [], boards: [], history: [] };
+let data = { players: [], chars: [], combos: [], h2h: [], boards: [], history: [], partners: [], profiles: [], charList: [] };
+
+/* ---------- Pictures: avatars and character icons ---------- */
+let CHARACTERS = [];          // names, for pickers
+let CHAR_IMG = {};            // name -> data URL
+let PROFILES = {};            // player_key -> profile row
+const COLORS = ["#049cd8", "#e52521", "#1f8a4c", "#8a4fd1", "#d9730d", "#c2185b", "#00897b", "#5d6d7e"];
+const TEAM_NAMES = ["", "Team A", "Team B", "Team C", "Team D"];
+
+function setLookups() {
+  CHARACTERS = data.charList.map(c => c.name);
+  CHAR_IMG = Object.fromEntries(data.charList.filter(c => c.image).map(c => [c.name, c.image]));
+  PROFILES = Object.fromEntries(data.profiles.map(p => [p.player_key, p]));
+}
+const initials = s => String(s || "?").trim().split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase();
+function colorFor(key) { let h = 0; for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return COLORS[h % COLORS.length]; }
+
+// Avatar for a player name: uploaded photo, else borrowed character picture, else colored initials.
+function avatar(name, size = "") {
+  const key = keyOf(name || "");
+  const p = PROFILES[key];
+  const src = p ? (p.avatar || CHAR_IMG[p.avatar_character]) : null;
+  if (src) return `<img class="av ${size}" src="${src}" alt="">`;
+  return `<span class="av ${size}" style="background:${colorFor(key)}">${esc(initials(name))}</span>`;
+}
+function charIcon(name, size = "") {
+  return CHAR_IMG[name] ? `<img class="ci ${size}" src="${CHAR_IMG[name]}" alt="">` : `<span class="ci ${size}">${esc(initials(name))}</span>`;
+}
+const who = name => `<span class="who">${avatar(name)}<b>${esc(name)}</b></span>`;
+const charWho = name => `<span class="who">${charIcon(name)}${esc(name)}</span>`;
 
 function showCached() {
   const cached = loadLocal();
@@ -367,11 +473,13 @@ async function refresh() {
   // supabase-js retries failed reads with backoff, so skip the wait when the phone knows it is offline.
   if (!navigator.onLine && showCached()) return;
   try {
-    const [players, chars, combos, h2h, boards, history] = await Promise.all([
+    const [players, chars, combos, h2h, boards, history, partners, profiles, charList] = await Promise.all([
       view("player_stats"), view("character_stats"), view("player_character_stats"),
-      view("head_to_head"), view("board_stats"), view("game_history")
+      view("head_to_head"), view("board_stats"), view("game_history"),
+      view("partner_stats"), view("player_profiles"),
+      sb.from("characters").select("name,image").order("name").then(must)
     ]);
-    data = { players, chars, combos, h2h, boards, history };
+    data = { players, chars, combos, h2h, boards, history, partners, profiles, charList };
     saveLocal(data);
     $("banner").classList.add("hidden");
     renderAll();
@@ -384,16 +492,25 @@ async function refresh() {
 window.addEventListener("online", () => { if (configured) refresh(); });
 
 function renderAll() {
+  // Older offline caches may lack the newer keys.
+  for (const k of ["partners", "profiles", "charList"]) data[k] = data[k] || [];
+  setLookups();
   data.players.sort((a, b) => byRank(a, b, "rank") || b.games - a.games);
   data.history.sort((a, b) => b.played_on.localeCompare(a.played_on) || b.created_at.localeCompare(a.created_at));
-  $("nameList").innerHTML = data.players.map(p => `<option value="${esc(p.player)}">`).join("");
+  const names = [...new Set([...data.players.map(p => p.player), ...data.profiles.map(p => p.display_name)])];
+  $("nameList").innerHTML = names.map(n => `<option value="${esc(n)}">`).join("");
+  const boardSel = $("gBoard"), keepBoard = boardSel.value;
+  fillSelect(boardSel, [...data.boards].sort((a, b) => a.sort_order - b.sort_order || a.board.localeCompare(b.board)).map(b => b.board), keepBoard);
+  refreshCharButtons();
   renderPlayers();
   renderRankFilter();
   renderRankings();
   renderH2H();
+  renderPartners();
   renderChars();
   renderBoards();
   renderHistory();
+  renderProfiles();
 }
 
 function renderPlayers() {
@@ -412,11 +529,11 @@ function renderPlayers() {
     `<thead><tr><th>#</th><th>Player</th><th class="n">Games</th><th class="n">Wins</th><th class="n">Win %</th><th class="n">vs. luck</th>
      <th class="n">Stars</th><th class="n">Stars/game</th><th class="n">Avg place</th><th>Main</th><th>Best board</th></tr></thead><tbody>` +
     list.map(p => `<tr class="${p.rank ? "" : "unranked"}">
-      <td>${p.rank ?? "-"}</td><td><b>${esc(p.player)}</b></td>
+      <td>${p.rank ?? "-"}</td><td>${who(p.player)}</td>
       <td class="n">${p.games}</td><td class="n">${p.wins}</td><td class="n">${pctCell(p.win_pct)}</td>
       <td class="n">${p.vs_luck === null ? "-" : Number(p.vs_luck).toFixed(2) + "x"}</td>
       <td class="n">${p.stars}</td><td class="n">${num(p.stars_per_game)}</td><td class="n">${num(p.avg_place)}</td>
-      <td>${esc(p.main_character || "-")}</td><td>${p.best_board ? esc(p.best_board) + " (" + p.best_board_wins + ")" : "-"}</td></tr>`).join("") +
+      <td>${p.main_character ? charWho(p.main_character) : "-"}</td><td>${p.best_board ? esc(p.best_board) + " (" + p.best_board_wins + ")" : "-"}</td></tr>`).join("") +
     "</tbody>";
 }
 
@@ -447,7 +564,7 @@ function renderRankings() {
   if (mode === "overall") {
     rows = [...rows].sort((a, b) => byRank(a, b, "rank_overall") || b.win_pct - a.win_pct || b.games - a.games);
     $("rankTable").innerHTML = `<thead><tr><th>#</th><th>Player</th><th>Character</th>${statHead}</tr></thead><tbody>` +
-      rows.map(r => `<tr class="${r.rank_overall ? "" : "unranked"}"><td>${r.rank_overall ?? "-"}</td><td><b>${esc(r.player)}</b></td><td>${esc(r.character)}</td>${stats(r)}</tr>`).join("") + "</tbody>";
+      rows.map(r => `<tr class="${r.rank_overall ? "" : "unranked"}"><td>${r.rank_overall ?? "-"}</td><td>${who(r.player)}</td><td>${charWho(r.character)}</td>${stats(r)}</tr>`).join("") + "</tbody>";
     $("rankNote").textContent = "Every player and character pair ranked against each other by win ratio. Pairs need 2 games to be ranked.";
     return;
   }
@@ -462,7 +579,7 @@ function renderRankings() {
     `<thead><tr><th>${mode === "player" ? "Player" : "Character"}</th><th>#</th><th>${mode === "player" ? "Character" : "Player"}</th>${statHead}</tr></thead><tbody>` +
     rows.map(r => {
       const first = r[group] !== last; last = r[group];
-      return `<tr class="${first ? "group-start" : ""}"><td><b>${first ? esc(r[group]) : ""}</b></td><td>${r[rankField]}</td><td>${esc(r[other])}</td>${stats(r)}</tr>`;
+      return `<tr class="${first ? "group-start" : ""}"><td>${first ? (group === "player" ? who(r.player) : charWho(r.character)) : ""}</td><td>${r[rankField]}</td><td>${other === "player" ? who(r.player) : charWho(r.character)}</td>${stats(r)}</tr>`;
     }).join("") + "</tbody>";
   $("rankNote").textContent = mode === "player"
     ? "Within each player, characters ranked by win ratio, then wins. #1 is that player's best pick."
@@ -480,7 +597,19 @@ function renderH2H() {
   if (!rows.length) return emptyRow("h2hTable", "This player has not played with anyone else yet.");
   $("h2hTable").innerHTML =
     `<thead><tr><th>Opponent</th><th class="n">Games together</th><th class="n">Finished ahead</th><th class="n">Finished behind</th><th class="n">Tied</th><th class="n">Ahead %</th></tr></thead><tbody>` +
-    rows.map(r => `<tr><td><b>${esc(r.opponent)}</b></td><td class="n">${r.games}</td><td class="n">${r.ahead}</td><td class="n">${r.behind}</td><td class="n">${r.ties}</td><td class="n">${pctCell(r.ahead_pct)}</td></tr>`).join("") +
+    rows.map(r => `<tr><td>${who(r.opponent)}</td><td class="n">${r.games}</td><td class="n">${r.ahead}</td><td class="n">${r.behind}</td><td class="n">${r.ties}</td><td class="n">${pctCell(r.ahead_pct)}</td></tr>`).join("") +
+    "</tbody>";
+}
+
+// Partner Party duos involving the selected player (or every duo if nobody is selected).
+function renderPartners() {
+  const me = $("h2hPlayer").value;
+  const rows = data.partners.filter(r => !me || r.key_a === me || r.key_b === me)
+    .sort((a, b) => b.win_pct - a.win_pct || b.games - a.games);
+  if (!rows.length) return emptyRow("partnerTable", "No Partner Party games for this player yet.");
+  $("partnerTable").innerHTML =
+    `<thead><tr><th>Team</th><th class="n">Games</th><th class="n">Wins</th><th class="n">Win %</th><th class="n">Avg place</th></tr></thead><tbody>` +
+    rows.map(r => `<tr><td>${who(r.player_a)} + ${who(r.player_b)}</td><td class="n">${r.games}</td><td class="n">${r.wins}</td><td class="n">${pctCell(r.win_pct)}</td><td class="n">${num(r.avg_place)}</td></tr>`).join("") +
     "</tbody>";
 }
 
@@ -489,8 +618,8 @@ function renderChars() {
   if (!list.length) return emptyRow("charTable", "No characters loaded.");
   $("charTable").innerHTML =
     `<thead><tr><th>#</th><th>Character</th><th class="n">Picks</th><th class="n">Wins</th><th class="n">Win %</th><th class="n">Stars/game</th><th>Played most by</th></tr></thead><tbody>` +
-    list.map(c => `<tr class="${c.rank ? "" : "unranked"}"><td>${c.rank ?? "-"}</td><td><b>${esc(c.character)}</b></td><td class="n">${c.picks}</td><td class="n">${c.wins}</td>
-      <td class="n">${pctCell(c.win_pct)}</td><td class="n">${num(c.stars_per_game)}</td><td>${c.top_player ? esc(c.top_player) + " (" + c.top_player_picks + ")" : "-"}</td></tr>`).join("") +
+    list.map(c => `<tr class="${c.rank ? "" : "unranked"}"><td>${c.rank ?? "-"}</td><td>${charWho(c.character)}</td><td class="n">${c.picks}</td><td class="n">${c.wins}</td>
+      <td class="n">${pctCell(c.win_pct)}</td><td class="n">${num(c.stars_per_game)}</td><td>${c.top_player ? who(c.top_player) + " (" + c.top_player_picks + ")" : "-"}</td></tr>`).join("") +
     "</tbody>";
 }
 
@@ -499,7 +628,7 @@ function renderBoards() {
   if (!list.length) return emptyRow("boardTable", "No boards loaded.");
   $("boardTable").innerHTML =
     `<thead><tr><th>Board</th><th class="n">Games</th><th>Top winner</th><th class="n">Avg stars per player</th></tr></thead><tbody>` +
-    list.map(b => `<tr><td><b>${esc(b.board)}</b></td><td class="n">${b.games}</td><td>${b.top_winner ? esc(b.top_winner) + " (" + b.top_winner_wins + ")" : "-"}</td><td class="n">${num(b.stars_per_player)}</td></tr>`).join("") +
+    list.map(b => `<tr><td><b>${esc(b.board)}</b></td><td class="n">${b.games}</td><td>${b.top_winner ? who(b.top_winner) + " (" + b.top_winner_wins + ")" : "-"}</td><td class="n">${num(b.stars_per_player)}</td></tr>`).join("") +
     "</tbody>";
 }
 
@@ -512,17 +641,58 @@ function renderHistory() {
         <span>${g.has_photo ? `<button class="link-btn" data-photo="${esc(g.id)}">View photo</button>` : ""}
           ${canEdit ? `<button class="link-btn danger" data-del="${esc(g.id)}">Delete</button>` : ""}</span>
       </div>
-      <div class="places">${(g.players || []).map(p =>
-        `<span class="pill ${p.place === 1 ? "first" : ""} ${p.cpu ? "cpu" : ""}">${ordinal(p.place)} ${esc(p.cpu ? "CPU" : p.name)} (${esc(p.character)}) &#9733;${esc(p.stars)}</span>`).join("")}
-      </div></div>`).join("");
+      <div class="places">${historyPills(g)}</div></div>`).join("");
+}
+
+function seatHTML(p) {
+  return `<span class="who">${p.cpu ? `<span class="av" style="background:#888">CPU</span>` : avatar(p.name)}${esc(p.cpu ? "CPU" : p.name)}</span>
+    <span class="muted">${charIcon(p.character)}</span>&#9733;${esc(p.stars)}`;
+}
+// Free-for-all: one pill per seat. Partner Party: one pill per team, teammates together.
+function historyPills(g) {
+  const seats = g.players || [];
+  if (g.mode !== "Partner Party" || !seats.some(p => p.team)) {
+    return seats.map(p => `<span class="pill ${p.place === 1 ? "first" : ""} ${p.cpu ? "cpu" : ""}">${ordinal(p.place)} ${seatHTML(p)}</span>`).join("");
+  }
+  const teams = {};
+  seats.forEach(p => (teams[p.team] = teams[p.team] || []).push(p));
+  return Object.values(teams).sort((a, b) => a[0].place - b[0].place).map(t =>
+    `<span class="pill ${t[0].place === 1 ? "first" : ""}" style="border-left:5px solid var(--t${t[0].team})">${ordinal(t[0].place)} <b>${TEAM_NAMES[t[0].team]}</b>: ${t.map(seatHTML).join(" + ")}</span>`).join("");
 }
 
 /* =====================================================================
    4. ADD GAME FORM
    ===================================================================== */
-let CHARACTERS = [];
 let photoData = null;
+const isPartner = () => $("gMode").value === "Partner Party";
 
+/* ----- Character picker: a button that opens a picture grid ----- */
+const charOf = row => row.querySelector(".p-char").dataset.value || "";
+function setChar(row, name) {
+  const btn = row.querySelector(".p-char");
+  btn.dataset.value = name || "";
+  btn.innerHTML = name ? `${charIcon(name)}<span>${esc(name)}</span>` : `<span class="muted">Pick...</span>`;
+}
+function refreshCharButtons() {   // redraw icons after pictures load or change
+  document.querySelectorAll("#playerRows .player").forEach(r => setChar(r, charOf(r)));
+}
+let pickingRow = null;
+function openCharPicker(row) {
+  pickingRow = row;
+  const current = charOf(row);
+  $("charGrid").innerHTML = CHARACTERS.map(n =>
+    `<button type="button" data-char="${esc(n)}" class="${n === current ? "sel" : ""}">${charIcon(n, "lg")}<span>${esc(n)}</span></button>`).join("");
+  $("charDialog").showModal();
+}
+$("charGrid").addEventListener("click", e => {
+  const b = e.target.closest("button[data-char]");
+  if (!b || !pickingRow) return;
+  setChar(pickingRow, b.dataset.char);
+  $("charDialog").close();
+});
+$("charCancel").addEventListener("click", () => $("charDialog").close());
+
+/* ----- Player rows ----- */
 function playerRow() {
   const div = document.createElement("div");
   div.className = "player";
@@ -530,12 +700,15 @@ function playerRow() {
     <span class="num"></span>
     <div class="name"><label>Name</label><input class="p-name" list="nameList" maxlength="30" placeholder="Name">
       <div class="cpu"><input type="checkbox" class="p-cpu"><label>CPU</label></div></div>
-    <div class="char"><label>Character</label><select class="p-char"></select></div>
+    <div class="char"><label>Character</label><button type="button" class="charbtn p-char"></button></div>
+    <div class="team-col"><label>Team</label><select class="p-team">
+      <option value="1">Team A</option><option value="2">Team B</option><option value="3">Team C</option><option value="4">Team D</option></select></div>
     <div><label>Place</label><select class="p-place"></select></div>
     <div><label>Stars</label><input class="p-stars" type="number" inputmode="numeric" min="0" max="99" value="0"></div>
     <div><label>Coins</label><input class="p-coins" type="number" inputmode="numeric" min="0" max="999" value="0"></div>
     <button type="button" class="icon-btn" title="Remove player" aria-label="Remove player">&times;</button>`;
-  fillSelect(div.querySelector(".p-char"), CHARACTERS);
+  setChar(div, CHARACTERS[0]);
+  div.querySelector(".p-char").addEventListener("click", () => openCharPicker(div));
   const cpu = div.querySelector(".p-cpu");
   cpu.addEventListener("change", () => {
     const name = div.querySelector(".p-name");
@@ -546,7 +719,21 @@ function playerRow() {
   div.querySelector(".icon-btn").addEventListener("click", () => {
     if ($("playerRows").children.length > 2) { div.remove(); renumber(); }
   });
+  // Teammates share a place: changing one updates the other.
+  const team = div.querySelector(".p-team");
+  team.addEventListener("change", () => {
+    div.dataset.team = team.value;
+    const mate = teammates(div)[0];
+    if (mate) div.querySelector(".p-place").selectedIndex = mate.querySelector(".p-place").selectedIndex;
+  });
+  div.querySelector(".p-place").addEventListener("change", e => {
+    if (isPartner()) teammates(div).forEach(m => m.querySelector(".p-place").selectedIndex = e.target.selectedIndex);
+  });
   return div;
+}
+function teammates(row) {
+  const t = row.querySelector(".p-team").value;
+  return [...$("playerRows").children].filter(r => r !== row && r.querySelector(".p-team").value === t);
 }
 function renumber() {
   const rows = [...$("playerRows").children];
@@ -556,13 +743,32 @@ function renumber() {
     const keep = place.options.length ? place.selectedIndex + 1 : i + 1;
     fillSelect(place, rows.map((_, j) => ordinal(j + 1)));
     place.selectedIndex = Math.min(keep, rows.length) - 1;
+    r.dataset.team = r.querySelector(".p-team").value;
   });
-  $("addRowBtn").disabled = rows.length >= MAX_PLAYERS;
+  $("addRowBtn").disabled = rows.length >= MAX_PLAYERS || isPartner();
 }
+
+// Partner Party in Jamboree is 2 vs 2: four rows, Team A on top, Team B below.
+function applyMode() {
+  const partner = isPartner();
+  $("playerRows").classList.toggle("partner", partner);
+  if (partner) {
+    while ($("playerRows").children.length < 4) $("playerRows").appendChild(playerRow());
+    while ($("playerRows").children.length > 4) $("playerRows").lastElementChild.remove();
+    renumber();
+    [...$("playerRows").children].forEach((r, i) => {
+      r.querySelector(".p-team").value = i < 2 ? "1" : "2";
+      r.querySelector(".p-place").selectedIndex = i < 2 ? 0 : 1;
+    });
+  }
+  renumber();
+}
+$("gMode").addEventListener("change", applyMode);
+
 function resetForm() {
   $("playerRows").innerHTML = "";
   for (let i = 0; i < 4; i++) $("playerRows").appendChild(playerRow());
-  renumber();
+  applyMode();
   $("photoInput").value = "";
   $("photoPreview").classList.add("hidden");
   photoData = null;
@@ -609,7 +815,8 @@ function readForm() {
   const players = [...$("playerRows").children].map(r => ({
     name: r.querySelector(".p-cpu").checked ? null : r.querySelector(".p-name").value.trim().replace(/\s+/g, " "),
     cpu: r.querySelector(".p-cpu").checked,
-    character: r.querySelector(".p-char").value,
+    character: charOf(r),
+    team: isPartner() ? Number(r.querySelector(".p-team").value) : null,
     place: r.querySelector(".p-place").selectedIndex + 1,
     stars: Math.max(0, Math.min(99, parseInt(r.querySelector(".p-stars").value, 10) || 0)),
     coins: Math.max(0, Math.min(999, parseInt(r.querySelector(".p-coins").value, 10) || 0))
@@ -619,6 +826,13 @@ function readForm() {
   const keys = players.filter(p => !p.cpu).map(p => keyOf(p.name));
   if (new Set(keys).size !== keys.length) throw new Error("The same name is in the game twice.");
   if (!players.some(p => p.place === 1)) throw new Error("Someone has to finish 1st.");
+  if (players.some(p => !p.character)) throw new Error("Pick a character for every player.");
+  if (isPartner()) {
+    const teams = {};
+    players.forEach(p => (teams[p.team] = teams[p.team] || []).push(p));
+    if (Object.values(teams).some(t => t.length !== 2)) throw new Error("Each team needs exactly 2 players.");
+    if (Object.values(teams).some(t => t[0].place !== t[1].place)) throw new Error("Teammates must finish in the same place.");
+  }
   return { played_on, board: $("gBoard").value, mode: $("gMode").value, turns: Number($("gTurns").value), players };
 }
 
@@ -630,14 +844,16 @@ $("saveBtn").addEventListener("click", async () => {
   try {
     must(await sb.rpc("add_game", { p_game: game, p_photo: photoData }));
     // Keep names and characters for the next game of the night, reset the rest.
-    const keep = [...$("playerRows").children].map(r => ({ name: r.querySelector(".p-name").value, cpu: r.querySelector(".p-cpu").checked, char: r.querySelector(".p-char").value }));
+    const keep = [...$("playerRows").children].map(r => ({ name: r.querySelector(".p-name").value, cpu: r.querySelector(".p-cpu").checked, char: charOf(r), team: r.querySelector(".p-team").value }));
     resetForm();
     while ($("playerRows").children.length < keep.length) $("playerRows").appendChild(playerRow());
     [...$("playerRows").children].forEach((r, i) => {
       r.querySelector(".p-name").value = keep[i].name;
       r.querySelector(".p-cpu").checked = keep[i].cpu;
       r.querySelector(".p-name").disabled = keep[i].cpu;
-      r.querySelector(".p-char").value = keep[i].char;
+      setChar(r, keep[i].char);
+      r.querySelector(".p-team").value = keep[i].team;
+      r.dataset.team = keep[i].team;
     });
     renumber();
     setMsg("Saved. Names and characters are kept for the next game.");
@@ -652,7 +868,7 @@ $("saveBtn").addEventListener("click", async () => {
 $("addRowBtn").addEventListener("click", () => {
   if ($("playerRows").children.length < MAX_PLAYERS) { $("playerRows").appendChild(playerRow()); renumber(); }
 });
-$("h2hPlayer").addEventListener("change", renderH2H);
+$("h2hPlayer").addEventListener("change", () => { renderH2H(); renderPartners(); });
 $("rankBy").addEventListener("change", () => { $("rankFilter").value = ""; renderRankFilter(); renderRankings(); });
 $("rankFilter").addEventListener("change", renderRankings);
 
@@ -681,6 +897,115 @@ $("historyList").addEventListener("click", async e => {
   }
 });
 $("closeDialog").addEventListener("click", () => $("photoDialog").close());
+
+/* =====================================================================
+   5. PROFILES TAB: player avatars and character pictures (editors only;
+   the database functions re-check editor rights).
+   ===================================================================== */
+// Shrink an image to a size x size square. "cover" crops (photos), "contain"
+// fits the whole picture with transparent edges (character art).
+async function squareImage(file, size, type, fit) {
+  const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
+  let px = size, out = "";
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const c = document.createElement("canvas");
+    c.width = c.height = px;
+    const ctx = c.getContext("2d");
+    if (type === "image/jpeg") { ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, px, px); }
+    if (fit === "cover") {
+      const s = Math.min(bmp.width, bmp.height);
+      ctx.drawImage(bmp, (bmp.width - s) / 2, (bmp.height - s) / 2, s, s, 0, 0, px, px);
+    } else {
+      const k = px / Math.max(bmp.width, bmp.height), w = bmp.width * k, h = bmp.height * k;
+      ctx.drawImage(bmp, (px - w) / 2, (px - h) / 2, w, h);
+    }
+    out = c.toDataURL(type, 0.85);
+    // Older Safari cannot encode WebP and silently returns PNG; that is fine.
+    if (out.length < 140000) return out;
+    px = Math.round(px * 0.75);
+  }
+  return out;
+}
+function pickFile() {
+  return new Promise(resolve => {
+    const inp = $("hiddenFile");
+    inp.value = "";
+    inp.onchange = () => resolve(inp.files[0] || null);
+    inp.click();
+  });
+}
+function flash(id, text, isErr) { $(id).className = "msg " + (isErr ? "err" : "ok"); $(id).textContent = text; }
+
+const extraNames = new Set();   // players added on this tab who have not played yet
+function renderProfiles() {
+  const names = new Map();
+  data.players.forEach(p => names.set(p.player_key, p.player));
+  data.profiles.forEach(p => names.set(p.player_key, p.display_name));
+  extraNames.forEach(n => { if (!names.has(keyOf(n))) names.set(keyOf(n), n); });
+  const list = [...names.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  $("profileList").innerHTML = !list.length ? `<p class="muted">No players yet. Add one below.</p>` :
+    list.map(([k, n]) => {
+      const p = PROFILES[k];
+      const borrowed = p && !p.avatar ? p.avatar_character : "";
+      return `<div class="prof-row" data-name="${esc(n)}">${avatar(n, "lg")}<span class="pname">${esc(n)}</span>
+        <button type="button" class="small-btn" data-act="upload">Upload photo</button>
+        <select data-act="char"><option value="">Use a character...</option>${CHARACTERS.map(c =>
+          `<option value="${esc(c)}"${c === borrowed ? " selected" : ""}>${esc(c)}</option>`).join("")}</select>
+        ${p ? `<button type="button" class="small-btn danger" data-act="clear">Remove</button>` : ""}</div>`;
+    }).join("");
+  $("charTiles").innerHTML = CHARACTERS.map(c => `<div class="char-tile" data-char="${esc(c)}">${charIcon(c, "lg")}<div>${esc(c)}</div>
+      <button type="button" class="small-btn" data-act="upload">Upload</button>${CHAR_IMG[c] ? ` <button type="button" class="small-btn danger" data-act="clear">Remove</button>` : ""}</div>`).join("");
+}
+
+async function saveAvatar(name, img, character) {
+  flash("profileMsg", "Saving...");
+  try {
+    must(await sb.rpc("set_player_avatar", { p_name: name, p_avatar: img, p_character: character }));
+    await refresh();
+    flash("profileMsg", img || character ? `Avatar saved for ${name}.` : `Avatar removed for ${name}.`);
+  } catch (e) { flash("profileMsg", "Could not save: " + e.message, true); }
+}
+$("profileList").addEventListener("click", async e => {
+  const btn = e.target.closest("button[data-act]");
+  if (!btn) return;
+  const name = btn.closest(".prof-row").dataset.name;
+  if (btn.dataset.act === "clear") return saveAvatar(name, null, null);
+  const file = await pickFile();
+  if (!file) return;
+  try { await saveAvatar(name, await squareImage(file, 160, "image/jpeg", "cover"), null); }
+  catch (err) { flash("profileMsg", "Could not read that image: " + err.message, true); }
+});
+$("profileList").addEventListener("change", e => {
+  if (e.target.dataset.act !== "char" || !e.target.value) return;
+  saveAvatar(e.target.closest(".prof-row").dataset.name, null, e.target.value);
+});
+$("addProfileBtn").addEventListener("click", () => {
+  const n = $("newProfileName").value.trim().replace(/\s+/g, " ");
+  if (!n) return flash("profileMsg", "Type a name first.", true);
+  extraNames.add(n);
+  $("newProfileName").value = "";
+  renderProfiles();
+  flash("profileMsg", `${n} added. Now upload a photo or pick a character for them.`);
+});
+
+$("charTiles").addEventListener("click", async e => {
+  const btn = e.target.closest("button[data-act]");
+  if (!btn) return;
+  const name = btn.closest(".char-tile").dataset.char;
+  let img = null;
+  if (btn.dataset.act === "upload") {
+    const file = await pickFile();
+    if (!file) return;
+    try { img = await squareImage(file, 128, "image/webp", "contain"); }
+    catch (err) { return flash("charMsg", "Could not read that image: " + err.message, true); }
+  }
+  flash("charMsg", "Saving...");
+  try {
+    must(await sb.rpc("set_character_image", { p_name: name, p_image: img }));
+    await refresh();
+    flash("charMsg", img ? `Picture saved for ${name}.` : `Picture removed for ${name}.`);
+  } catch (err) { flash("charMsg", "Could not save: " + err.message, true); }
+});
 
 /* ---------- Tabs ---------- */
 function showTab(name) {
@@ -749,17 +1074,8 @@ if (!configured) {
   // Draw the last saved stats right away so the app opens instantly, then update.
   const cached = loadLocal();
   if (cached) { data = cached.d; renderAll(); }
-  if (!navigator.onLine) showCached();
-  else try {
-    const [chars, boards] = await Promise.all([
-      sb.from("characters").select("name").order("name").then(must),
-      sb.from("boards").select("name,sort_order").order("sort_order").order("name").then(must)
-    ]);
-    CHARACTERS = chars.map(c => c.name);
-    fillSelect($("gBoard"), boards.map(b => b.name));
-  } catch (e) {
-    showBanner("Could not reach Supabase: " + esc(e.message) + ". Check config.js and that supabase/schema.sql has been run.", true);
-  }
+  // Stats, character list (with pictures), boards and profiles all come from refresh().
+  await refresh();
   resetForm();
   const { data: { session: s } } = await sb.auth.getSession();
   await updateAuth(s);
@@ -769,7 +1085,6 @@ if (!configured) {
     if (event === "INITIAL_SESSION") return;
     setTimeout(() => updateAuth(s), 0);
   });
-  await refresh();
 }
 </script>
 </body>

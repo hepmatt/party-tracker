@@ -56,6 +56,12 @@ create table if not exists public.boards (
   sort_order int  not null default 100
 );
 
+-- Optional picture per character, uploaded from the Profiles tab.
+alter table public.characters add column if not exists image text;
+alter table public.characters drop constraint if exists characters_image_check;
+alter table public.characters add constraint characters_image_check
+  check (image is null or (image ~ '^data:image/(png|jpeg|webp);base64,' and length(image) < 150000));
+
 insert into public.characters (name) values
   ('Mario'), ('Luigi'), ('Peach'), ('Daisy'), ('Wario'), ('Waluigi'),
   ('Yoshi'), ('Birdo'), ('Rosalina'), ('Donkey Kong'), ('Toad'), ('Toadette'),
@@ -100,6 +106,9 @@ create table if not exists public.game_players (
   constraint cpu_has_no_name check (is_cpu = (player_name is null))
 );
 
+-- Partner Party team (1-4). NULL in every other mode.
+alter table public.game_players add column if not exists team smallint check (team between 1 and 4);
+
 -- The same person cannot sit in one game twice.
 create unique index if not exists game_players_one_seat_per_person
   on public.game_players (game_id, player_key) where not is_cpu;
@@ -114,6 +123,66 @@ create table if not exists public.game_photos (
 );
 
 
+-- One profile per person (keyed like game_players.player_key). Holds the
+-- avatar: an uploaded picture, or a character to borrow the picture from.
+create table if not exists public.player_profiles (
+  player_key       text primary key
+                   check (player_key = regexp_replace(lower(btrim(player_key)), '\s+', ' ', 'g')
+                          and char_length(player_key) between 1 and 30),
+  display_name     text not null check (char_length(display_name) between 1 and 30),
+  avatar           text check (avatar is null or (avatar ~ '^data:image/(png|jpeg|webp);base64,' and length(avatar) < 150000)),
+  avatar_character text references public.characters (name) on update cascade on delete set null,
+  updated_at       timestamptz not null default now()
+);
+
+
+-- ---------------------------------------------------------------------
+-- 2b. Editor-only setters for pictures. SECURITY DEFINER so the public
+--     roles need no write grants; each checks is_editor() first.
+-- ---------------------------------------------------------------------
+create or replace function public.set_character_image(p_name text, p_image text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_editor() then
+    raise exception 'Only approved editors can change pictures.' using errcode = '42501';
+  end if;
+  update characters set image = p_image where name = p_name;
+  if not found then raise exception 'Unknown character: %', p_name; end if;
+end;
+$$;
+
+-- Pass NULL for both p_avatar and p_character to clear a profile.
+create or replace function public.set_player_avatar(p_name text, p_avatar text, p_character text default null)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_name text := regexp_replace(btrim(coalesce(p_name, '')), '\s+', ' ', 'g');
+  v_key  text := lower(v_name);
+begin
+  if not public.is_editor() then
+    raise exception 'Only approved editors can change avatars.' using errcode = '42501';
+  end if;
+  if v_name = '' then raise exception 'A player name is required.'; end if;
+  if p_avatar is null and p_character is null then
+    delete from player_profiles where player_key = v_key;
+    return;
+  end if;
+  insert into player_profiles (player_key, display_name, avatar, avatar_character, updated_at)
+  values (v_key, v_name, p_avatar, p_character, now())
+  on conflict (player_key) do update
+    set display_name = excluded.display_name, avatar = excluded.avatar,
+        avatar_character = excluded.avatar_character, updated_at = now();
+end;
+$$;
+
+
 -- ---------------------------------------------------------------------
 -- 3. The only way to add a game. SECURITY DEFINER lets it insert even
 --    though the public role has no INSERT grant, so every game is
@@ -126,8 +195,9 @@ security definer
 set search_path = public
 as $$
 declare
-  v_id bigint;
-  v_n  int := coalesce(jsonb_array_length(p_game -> 'players'), 0);
+  v_id      bigint;
+  v_n       int  := coalesce(jsonb_array_length(p_game -> 'players'), 0);
+  v_partner bool := coalesce(p_game ->> 'mode', 'Party') = 'Partner Party';
 begin
   if not public.is_editor() then
     raise exception 'Only approved editors can add games. Sign in first.'
@@ -145,7 +215,7 @@ begin
           (p_game ->> 'turns')::smallint)
   returning id into v_id;
 
-  insert into game_players (game_id, seat, player_name, is_cpu, character, place, stars, coins)
+  insert into game_players (game_id, seat, player_name, is_cpu, character, place, stars, coins, team)
   select v_id,
          t.ord,
          case when coalesce((t.p ->> 'cpu')::boolean, false) then null
@@ -154,8 +224,22 @@ begin
          t.p ->> 'character',
          (t.p ->> 'place')::smallint,
          coalesce((t.p ->> 'stars')::smallint, 0),
-         coalesce((t.p ->> 'coins')::smallint, 0)
+         coalesce((t.p ->> 'coins')::smallint, 0),
+         case when v_partner then (t.p ->> 'team')::smallint end
   from jsonb_array_elements(p_game -> 'players') with ordinality as t (p, ord);
+
+  -- Partner Party: everyone on a team of exactly 2, teammates share a place.
+  if v_partner then
+    if exists (select 1 from game_players where game_id = v_id and team is null) then
+      raise exception 'In Partner Party every player needs a team.';
+    end if;
+    if exists (select 1 from game_players where game_id = v_id group by team having count(*) <> 2) then
+      raise exception 'Each Partner Party team needs exactly 2 players.';
+    end if;
+    if exists (select 1 from game_players where game_id = v_id group by team having count(distinct place) > 1) then
+      raise exception 'Teammates must finish in the same place.';
+    end if;
+  end if;
 
   if not exists (select 1 from game_players where game_id = v_id and place = 1) then
     raise exception 'Someone has to finish 1st.';
@@ -194,11 +278,17 @@ group by player_key;
 
 -- Leaderboard: one row per person.
 create or replace view public.player_stats with (security_invoker = true) as
-with seats as (
-  select gp.*, g.board, g.mode,
-         count(*) over (partition by gp.game_id) as n_players   -- includes CPUs
+with sides as (
+  -- Competing sides per game: each team counts once, everyone else (CPUs too) on their own.
+  select game_id, count(distinct coalesce('t' || team, 's' || seat)) as n_sides
+  from public.game_players
+  group by game_id
+),
+seats as (
+  select gp.*, g.board, g.mode, s.n_sides
   from public.game_players gp
   join public.games g on g.id = gp.game_id
+  join sides s on s.game_id = gp.game_id
 ),
 humans as (
   select * from seats where not is_cpu
@@ -208,9 +298,8 @@ agg as (
          count(*)::int                              as games,
          (count(*) filter (where place = 1))::int   as wins,
          -- Wins that pure luck would give in these same games:
-         -- 1/n for a free-for-all, 1/2 for a 2v2 Partner Party.
-         sum(case when mode = 'Partner Party' then 0.5
-                  else 1.0 / n_players end)         as expected_wins,
+         -- 1 / number of sides (players, or teams in Partner Party).
+         sum(1.0 / n_sides)                         as expected_wins,
          sum(stars)::int                            as stars,
          avg(stars)                                 as avg_stars,
          avg(place)                                 as avg_place
@@ -347,7 +436,31 @@ join public.game_players b
 join public.player_names na on na.player_key = a.player_key
 join public.player_names nb on nb.player_key = b.player_key
 where not a.is_cpu and not b.is_cpu
+  and (a.team is null or b.team is null or a.team <> b.team)   -- teammates are not opponents
 group by a.player_key, na.player, b.player_key, nb.player;
+
+
+-- Partner Party duos: how each pair does as teammates.
+create or replace view public.partner_stats with (security_invoker = true) as
+with duos as (
+  select a.player_key as key_a, b.player_key as key_b, a.place
+  from public.game_players a
+  join public.game_players b
+    on b.game_id = a.game_id and b.team = a.team and b.player_key > a.player_key
+  where a.team is not null and not a.is_cpu and not b.is_cpu
+)
+select na.player                                         as player_a,
+       nb.player                                         as player_b,
+       d.key_a,
+       d.key_b,
+       count(*)::int                                     as games,
+       (count(*) filter (where d.place = 1))::int        as wins,
+       round(100.0 * count(*) filter (where d.place = 1) / count(*), 1) as win_pct,
+       round(avg(d.place), 2)                            as avg_place
+from duos d
+join public.player_names na on na.player_key = d.key_a
+join public.player_names nb on nb.player_key = d.key_b
+group by na.player, nb.player, d.key_a, d.key_b;
 
 
 create or replace view public.board_stats with (security_invoker = true) as
@@ -393,8 +506,8 @@ select g.id,
        exists (select 1 from public.game_photos ph where ph.game_id = g.id) as has_photo,
        (select json_agg(json_build_object(
                   'name', gp.player_name, 'cpu', gp.is_cpu, 'character', gp.character,
-                  'place', gp.place, 'stars', gp.stars, 'coins', gp.coins)
-                order by gp.place, gp.seat)
+                  'place', gp.place, 'stars', gp.stars, 'coins', gp.coins, 'team', gp.team)
+                order by gp.place, gp.team, gp.seat)
         from public.game_players gp
         where gp.game_id = g.id)                                         as players
 from public.games g;
@@ -409,6 +522,9 @@ alter table public.games        enable row level security;
 alter table public.game_players enable row level security;
 alter table public.game_photos  enable row level security;
 alter table public.editors      enable row level security;   -- no policies: only is_editor() reads it
+alter table public.player_profiles enable row level security;
+drop policy if exists "public read" on public.player_profiles;
+create policy "public read" on public.player_profiles for select to anon, authenticated using (true);
 
 drop policy if exists "public read" on public.characters;
 drop policy if exists "public read" on public.boards;
@@ -427,13 +543,14 @@ create policy "editor delete" on public.games        for delete to authenticated
 
 -- Supabase grants broad table rights to anon by default. Narrow them.
 revoke all on public.characters, public.boards, public.games,
-              public.game_players, public.game_photos, public.editors
+              public.game_players, public.game_photos, public.editors,
+              public.player_profiles
   from anon, authenticated;
 
 grant select on public.characters, public.boards, public.games,
-                public.game_players, public.game_photos,
+                public.game_players, public.game_photos, public.player_profiles,
                 public.player_names, public.player_stats, public.character_stats,
-                public.player_character_stats, public.head_to_head,
+                public.player_character_stats, public.head_to_head, public.partner_stats,
                 public.board_stats, public.game_history
   to anon, authenticated;
 
@@ -443,6 +560,11 @@ grant delete on public.games to authenticated;
 -- add_game() checks is_editor() itself, so anon gets a clear error, not a silent no-op.
 revoke execute on function public.add_game(jsonb, text) from public, anon;
 grant  execute on function public.add_game(jsonb, text) to authenticated;
+
+revoke execute on function public.set_character_image(text, text) from public, anon;
+grant  execute on function public.set_character_image(text, text) to authenticated;
+revoke execute on function public.set_player_avatar(text, text, text) from public, anon;
+grant  execute on function public.set_player_avatar(text, text, text) to authenticated;
 
 revoke execute on function public.is_editor() from public;
 grant  execute on function public.is_editor() to anon, authenticated;
