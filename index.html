@@ -109,6 +109,9 @@
   .who-pick select { flex: 1; min-width: 0; }
   .who-pick .av { width: 36px; height: 36px; margin: 0; font-size: 0.8rem; }
   .av.empty { background: transparent; border: 2px dashed var(--line); }
+  .auto-places { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; margin: 0.2rem 0 0.4rem; cursor: pointer; }
+  .auto-places input { width: auto; }
+  .p-place:disabled { opacity: 1; color: var(--ink); background: var(--line); }
   /* Party Animal subtitle: most milk parties thrown */
   .who.titled { flex-wrap: wrap; }
   .title-tag { display: block; flex-basis: 100%; padding-left: calc(28px + 0.4rem); font-size: 0.7rem; font-weight: bold;
@@ -218,7 +221,8 @@
 
   <!-- ADD GAME -->
   <section id="tab-add" class="card hidden">
-    <h2>Add a game</h2>
+    <h2 id="formTitle">Add a game</h2>
+    <p id="editNote" class="banner hidden"></p>
     <div class="photo-box">
       <label for="photoInput" style="display:inline">Results screen photo (optional)</label><br>
       <input type="file" id="photoInput" accept="image/*" style="max-width:320px;margin:0.4rem auto 0">
@@ -234,15 +238,19 @@
     </div>
 
     <h3>Players</h3>
+    <label class="auto-places"><input type="checkbox" id="autoPlaces" checked>
+      Auto places: most stars finishes highest, ties go to most coins</label>
     <div id="playerRows"></div>
     <datalist id="nameList"></datalist>
 
     <div class="actions">
       <button class="secondary" id="addRowBtn" type="button">+ Add player</button>
       <button class="primary" id="saveBtn" type="button">Save game</button>
+      <button class="secondary hidden" id="cancelEditBtn" type="button">Cancel edit</button>
       <span id="saveMsg" class="msg"></span>
     </div>
-    <p class="note">Tick CPU for computer players. They take up a place but are left out of player and character stats. Tied players share a place, and a tie for 1st gives each of them a win.
+    <p class="note">Enter final stars and coins (after bonus stars) and places fill in by themselves. Players level on both stars and coins share a place. Untick Auto places to set places by hand, for example after a tiebreaker.
+    Tick CPU for computer players. They take up a place but are left out of player and character stats.
     <b>Partner Party:</b> pick a team for each player. Teammates always share a place, so setting one sets the other.</p>
   </section>
 
@@ -669,7 +677,7 @@ function renderHistory() {
       <div class="game-head">
         <span><b>${esc(g.board)}</b> <span class="muted">${esc(g.played_on)} &middot; ${esc(g.mode)} &middot; ${esc(g.turns)} turns</span></span>
         <span>${g.has_photo ? `<button class="link-btn" data-photo="${esc(g.id)}">View photo</button>` : ""}
-          ${canEdit ? `<button class="link-btn danger" data-del="${esc(g.id)}">Delete</button>` : ""}</span>
+          ${canEdit ? `<button class="link-btn" data-edit="${esc(g.id)}">Edit</button> <button class="link-btn danger" data-del="${esc(g.id)}">Delete</button>` : ""}</span>
       </div>
       <div class="places">${historyPills(g)}</div></div>`).join("");
 }
@@ -803,6 +811,9 @@ function playerRow() {
     refreshWho();
   });
   div.querySelector(".p-name").addEventListener("input", () => showRowAvatar(div));
+  div.querySelector(".p-stars").addEventListener("input", autoPlaces);
+  div.querySelector(".p-coins").addEventListener("input", autoPlaces);
+  div.querySelector(".p-team").addEventListener("change", autoPlaces);
   fillWho(div);
   div.querySelector(".p-cpu + label").addEventListener("click", () => cpu.click());
   div.querySelector(".icon-btn").addEventListener("click", () => {
@@ -836,7 +847,33 @@ function renumber() {
   });
   $("addRowBtn").disabled = rows.length >= MAX_PLAYERS || isPartner();
   refreshWho();
+  autoPlaces();
 }
+
+/* ----- Auto places: rank by stars, then coins. Partner Party ranks teams by
+   their combined stars and coins. Level on both = shared place. ----- */
+const isAuto = () => $("autoPlaces").checked;
+function computedPlaces() {
+  const rows = [...$("playerRows").children];
+  const val = (r, cls) => Number(r.querySelector(cls).value) || 0;
+  const sideOf = r => isPartner() ? "t" + r.querySelector(".p-team").value : r;
+  const sides = new Map();
+  rows.forEach(r => {
+    const k = sideOf(r), cur = sides.get(k) || { stars: 0, coins: 0 };
+    sides.set(k, { stars: cur.stars + val(r, ".p-stars"), coins: cur.coins + val(r, ".p-coins") });
+  });
+  const order = [...sides.values()].sort((a, b) => b.stars - a.stars || b.coins - a.coins);
+  // Competition ranking: two tied for 1st are both 1st, the next is 3rd.
+  const placeOf = side => 1 + order.filter(o => o.stars > side.stars || (o.stars === side.stars && o.coins > side.coins)).length;
+  return rows.map(r => placeOf(sides.get(sideOf(r))));
+}
+function autoPlaces() {
+  const rows = [...$("playerRows").children];
+  rows.forEach(r => r.querySelector(".p-place").disabled = isAuto());
+  if (!isAuto()) return;
+  computedPlaces().forEach((place, i) => rows[i].querySelector(".p-place").selectedIndex = place - 1);
+}
+$("autoPlaces").addEventListener("change", autoPlaces);
 
 // Partner Party in Jamboree is 2 vs 2: four rows, Team A on top, Team B below.
 function applyMode() {
@@ -863,6 +900,7 @@ function resetForm() {
   for (let i = 0; i < 4; i++) $("playerRows").appendChild(playerRow());
   applyMode();
   applyBoard();
+  autoPlaces();
   $("photoInput").value = "";
   $("photoPreview").classList.add("hidden");
   photoData = null;
@@ -920,6 +958,7 @@ function readForm() {
   if (!players.some(p => !p.cpu)) throw new Error("At least one player must be a person.");
   const keys = players.filter(p => !p.cpu).map(p => keyOf(p.name));
   if (new Set(keys).size !== keys.length) throw new Error("The same name is in the game twice.");
+  if (isAuto() && players.every(p => !p.stars && !p.coins)) throw new Error("Enter everyone's stars and coins, or untick Auto places and set places by hand.");
   if (!players.some(p => p.place === 1)) throw new Error("Someone has to finish 1st.");
   if (players.some(p => !p.character)) throw new Error("Pick a character for every player.");
   if (isPartner()) {
@@ -936,6 +975,21 @@ $("saveBtn").addEventListener("click", async () => {
   try { game = readForm(); } catch (e) { setMsg(e.message, true); return; }
   $("saveBtn").disabled = true;
   setMsg("Saving...");
+  if (editingId) {
+    try {
+      must(await sb.rpc("update_game", { p_id: editingId, p_game: game, p_photo: photoData }));
+      endEdit();
+      await refresh();
+      resetForm();
+      showTab("history");
+      setMsg("");
+    } catch (e) {
+      setMsg("Save failed: " + e.message, true);
+    } finally {
+      $("saveBtn").disabled = !canEdit;
+    }
+    return;
+  }
   try {
     must(await sb.rpc("add_game", { p_game: game, p_photo: photoData }));
     // Keep names and characters for the next game of the night, reset the rest.
@@ -969,9 +1023,73 @@ $("h2hPlayer").addEventListener("change", () => { renderH2H(); renderPartners();
 $("rankBy").addEventListener("change", () => { $("rankFilter").value = ""; renderRankFilter(); renderRankings(); });
 $("rankFilter").addEventListener("change", renderRankings);
 
+/* ---------- Edit a past game: load it into the Add game form ---------- */
+let editingId = null;
+function startEdit(g) {
+  editingId = g.id;
+  showTab("add");
+  $("gDate").value = g.played_on;
+  if (![...$("gBoard").options].some(o => o.value === g.board)) $("gBoard").add(new Option(g.board, g.board));
+  $("gBoard").value = g.board;
+  $("gMode").value = g.mode;
+  if (![...$("gTurns").options].some(o => o.value === String(g.turns))) $("gTurns").add(new Option(g.turns, g.turns));
+  $("gTurns").value = String(g.turns);
+  $("photoInput").value = ""; $("photoPreview").classList.add("hidden"); photoData = null;
+
+  // Rebuild the rows from the saved seats, with auto places off so nothing moves while loading.
+  $("autoPlaces").checked = false;
+  $("playerRows").innerHTML = "";
+  $("playerRows").classList.toggle("partner", isPartner());
+  g.players.forEach(() => $("playerRows").appendChild(playerRow()));
+  renumber();
+  [...$("playerRows").children].forEach((r, i) => {
+    const p = g.players[i];
+    r.querySelector(".p-cpu").checked = p.cpu;
+    r.querySelector(".p-who").disabled = p.cpu;
+    setName(r, p.cpu ? "" : p.name);
+    setChar(r, p.character);
+    if (p.team) { r.querySelector(".p-team").value = String(p.team); r.dataset.team = String(p.team); }
+    r.querySelector(".p-stars").value = p.stars;
+    r.querySelector(".p-coins").value = p.coins;
+    r.querySelector(".p-milk").textContent = p.milk_parties || 0;
+  });
+  refreshWho();
+  applyBoard();
+  // Set the saved places, then compare them with what stars and coins would give.
+  [...$("playerRows").children].forEach((r, i) => r.querySelector(".p-place").selectedIndex = g.players[i].place - 1);
+  const saved = g.players.map(p => p.place), auto = computedPlaces();
+  const matches = saved.every((pl, i) => pl === auto[i]);
+  $("autoPlaces").checked = matches;
+  autoPlaces();
+
+  $("formTitle").textContent = "Edit game";
+  $("editNote").innerHTML = `Editing the <b>${esc(g.board)}</b> game from <b>${esc(g.played_on)}</b>. Leave the photo empty to keep the current one.` +
+    (matches ? "" : `<br>The saved places do not follow stars and coins. Tick <b>Auto places</b> to re-rank them, or leave it unticked to keep them.`);
+  $("editNote").className = "banner";
+  $("saveBtn").textContent = "Save changes";
+  $("cancelEditBtn").classList.remove("hidden");
+  setMsg("");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+function endEdit() {
+  editingId = null;
+  $("formTitle").textContent = "Add a game";
+  $("editNote").className = "banner hidden";
+  $("saveBtn").textContent = "Save game";
+  $("cancelEditBtn").classList.add("hidden");
+  $("autoPlaces").checked = true;
+  $("gDate").value = today();
+}
+$("cancelEditBtn").addEventListener("click", () => { endEdit(); resetForm(); setMsg(""); showTab("history"); });
+
 /* ---------- History actions ---------- */
 $("historyList").addEventListener("click", async e => {
-  const photoId = e.target.dataset.photo, delId = e.target.dataset.del;
+  const photoId = e.target.dataset.photo, delId = e.target.dataset.del, editId = e.target.dataset.edit;
+  if (editId) {
+    const g = data.history.find(x => String(x.id) === editId);
+    if (g) startEdit(g);
+    return;
+  }
   if (photoId) {
     try {
       const rows = must(await sb.from("game_photos").select("data").eq("game_id", photoId));

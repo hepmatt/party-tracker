@@ -215,32 +215,21 @@ $$;
 --    though the public role has no INSERT grant, so every game is
 --    validated here before it lands.
 -- ---------------------------------------------------------------------
-create or replace function public.add_game(p_game jsonb, p_photo text default null)
-returns bigint
+-- Shared by add_game() and update_game(): writes one game's seats and checks
+-- the whole game. Internal only: not callable through the API.
+create or replace function public._write_game_players(v_id bigint, p_game jsonb)
+returns void
 language plpgsql
 security definer
 set search_path = public
 as $$
 declare
-  v_id      bigint;
   v_n       int  := coalesce(jsonb_array_length(p_game -> 'players'), 0);
   v_partner bool := coalesce(p_game ->> 'mode', 'Party') = 'Partner Party';
 begin
-  if not public.is_editor() then
-    raise exception 'Only approved editors can add games. Sign in first.'
-      using errcode = '42501';
-  end if;
-
   if v_n not between 2 and 8 then
     raise exception 'A game needs 2 to 8 players (got %).', v_n;
   end if;
-
-  insert into games (played_on, board, mode, turns)
-  values ((p_game ->> 'played_on')::date,
-          p_game ->> 'board',
-          coalesce(p_game ->> 'mode', 'Party'),
-          (p_game ->> 'turns')::smallint)
-  returning id into v_id;
 
   insert into game_players (game_id, seat, player_name, is_cpu, character, place, stars, coins, team, milk_parties)
   select v_id,
@@ -280,18 +269,78 @@ begin
     raise exception 'A place is higher than the number of players.';
   end if;
 
-  if p_photo is not null then
-    insert into game_photos (game_id, data) values (v_id, p_photo);
-  end if;
-
   -- Guests typed in on the spot join the roster for next time.
   insert into player_profiles (player_key, display_name)
   select distinct on (player_key) player_key, player_name
   from game_players
   where game_id = v_id and not is_cpu
   on conflict (player_key) do nothing;
+end;
+$$;
+
+-- The only way to add a game: one transaction, so a bad seat saves nothing.
+create or replace function public.add_game(p_game jsonb, p_photo text default null)
+returns bigint
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_id bigint;
+begin
+  if not public.is_editor() then
+    raise exception 'Only approved editors can add games. Sign in first.'
+      using errcode = '42501';
+  end if;
+
+  insert into games (played_on, board, mode, turns)
+  values ((p_game ->> 'played_on')::date,
+          p_game ->> 'board',
+          coalesce(p_game ->> 'mode', 'Party'),
+          (p_game ->> 'turns')::smallint)
+  returning id into v_id;
+
+  perform public._write_game_players(v_id, p_game);
+
+  if p_photo is not null then
+    insert into game_photos (game_id, data) values (v_id, p_photo);
+  end if;
 
   return v_id;
+end;
+$$;
+
+-- Edit a logged game: replaces its details and every seat in one transaction.
+-- The photo is kept unless a new one is passed.
+create or replace function public.update_game(p_id bigint, p_game jsonb, p_photo text default null)
+returns bigint
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_editor() then
+    raise exception 'Only approved editors can edit games. Sign in first.'
+      using errcode = '42501';
+  end if;
+
+  update games
+     set played_on = (p_game ->> 'played_on')::date,
+         board     = p_game ->> 'board',
+         mode      = coalesce(p_game ->> 'mode', 'Party'),
+         turns     = (p_game ->> 'turns')::smallint
+   where id = p_id;
+  if not found then raise exception 'Game % not found.', p_id; end if;
+
+  delete from game_players where game_id = p_id;
+  perform public._write_game_players(p_id, p_game);
+
+  if p_photo is not null then
+    insert into game_photos (game_id, data) values (p_id, p_photo)
+    on conflict (game_id) do update set data = excluded.data;
+  end if;
+
+  return p_id;
 end;
 $$;
 
@@ -613,6 +662,10 @@ grant delete on public.games to authenticated;
 -- add_game() checks is_editor() itself, so anon gets a clear error, not a silent no-op.
 revoke execute on function public.add_game(jsonb, text) from public, anon;
 grant  execute on function public.add_game(jsonb, text) to authenticated;
+revoke execute on function public.update_game(bigint, jsonb, text) from public, anon;
+grant  execute on function public.update_game(bigint, jsonb, text) to authenticated;
+-- Internal helper: nobody calls it directly.
+revoke execute on function public._write_game_players(bigint, jsonb) from public, anon, authenticated;
 
 revoke execute on function public.set_character_image(text, text) from public, anon;
 grant  execute on function public.set_character_image(text, text) to authenticated;
